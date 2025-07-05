@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package microwatcher.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/microwatcher/shared/gen/microwatcher/v1;microwatcherv1";
+
+message Telemetry {
+  google.protobuf.Timestamp timestamp = 1;
+  string identifier = 2;
+  uint64 total_memory = 3;
+  uint64 free_memory = 4;
+  uint64 used_memory = 5;
+}
+
+message SendTelemetryRequest {
+  repeated Telemetry telemetries = 1;
+}
+
+message SendTelemetryResponse {
+  bool success = 1;
+}
+
+service TelemetryService {
+  rpc SendTelemetry(SendTelemetryRequest) returns (SendTelemetryResponse) {}
+}
+
