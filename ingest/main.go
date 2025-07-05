@@ -27,7 +27,9 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	v1.RegisterTelemetryServiceServer(s, &internal.Server{})
+	v1.RegisterTelemetryServiceServer(s, &internal.Server{
+		Logger: logger,
+	})
 
 	logger.Info("Starting server...", slog.String("port", Port))
 

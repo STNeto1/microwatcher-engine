@@ -5,13 +5,18 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/microwatcher/agent/internal"
 	"github.com/microwatcher/agent/internal/config"
 	"github.com/microwatcher/agent/internal/systeminformation"
+	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func Start(ctx context.Context, config *config.Config) {
 	aliveTicker := time.NewTicker(time.Second * 5)
 	processTicker := time.NewTicker(config.Interval)
+
+	client := internal.NewIngestClient("localhost:50051")
 
 	defer aliveTicker.Stop()
 	defer processTicker.Stop()
@@ -28,17 +33,29 @@ func Start(ctx context.Context, config *config.Config) {
 	}()
 
 	go func() {
+		var telemetries []*v1.Telemetry
+
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-processTicker.C:
-				config.Logger.Info("processing info")
 				runInfo := systeminformation.GetSystemInformation(config)
-				config.Logger.Info(
-					"done processing info",
-					slog.Any("info", runInfo),
-				)
+
+				telemetries = append(telemetries, &v1.Telemetry{
+					Timestamp:   timestamppb.Now(),
+					Identifier:  config.Identifier,
+					TotalMemory: runInfo.TotalMemory,
+					FreeMemory:  runInfo.FreeMemory,
+					UsedMemory:  runInfo.UsedMemory,
+				})
+
+				if err := client.SendData(telemetries); err != nil {
+					config.Logger.Error("failed to send data", slog.String("error", err.Error()))
+					continue
+				}
+
+				telemetries = make([]*v1.Telemetry, 0)
 			}
 		}
 	}()
