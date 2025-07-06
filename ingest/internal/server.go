@@ -19,7 +19,7 @@ type Server struct {
 }
 
 func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryRequest) (*v1.SendTelemetryResponse, error) {
-	spanCtx, span := otlp.IngestTracer.Start(ctx, "SendTelemetry",
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "Server.SendTelemetry",
 		trace.WithAttributes(attribute.String("method", "SendTelemetry")),
 		trace.WithAttributes(attribute.Int("batch size", len(req.Telemetries))),
 	)

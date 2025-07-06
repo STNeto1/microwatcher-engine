@@ -6,13 +6,13 @@ import (
 	"net"
 	"os"
 
+	_ "github.com/joho/godotenv/autoload"
 	"github.com/microwatcher/ingest/internal"
 	"github.com/microwatcher/ingest/internal/otlp"
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
 	"github.com/microwatcher/shared/pkg/logger"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
-
 	"google.golang.org/grpc"
 )
 
@@ -21,7 +21,7 @@ const Port = "50051"
 func main() {
 	logger := logger.NewDefaultLogger()
 
-	otelShutdown := otlp.InitTracer(context.Background(), logger)
+	otelShutdown := otlp.InitLocalTracer(context.Background(), logger)
 	defer otelShutdown()
 
 	lis, err := net.Listen("tcp", ":"+Port)

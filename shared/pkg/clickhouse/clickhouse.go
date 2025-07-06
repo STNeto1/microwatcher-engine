@@ -20,7 +20,7 @@ type ClickhouseSource struct {
 }
 
 func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
-	spanCtx, span := otlp.IngestTracer.Start(ctx, "IngestV1Telemetries",
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1Telemetries",
 		trace.WithAttributes(),
 	)
 	defer span.End()
@@ -35,7 +35,16 @@ func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetrie
 	defer batch.Close()
 
 	for _, telemetry := range telemetries {
-		// TODO: maybe add a more granular span here
+		_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
+			trace.WithAttributes(
+				attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+				attribute.String("identifier", telemetry.Identifier),
+				attribute.Int64("total_memory", int64(telemetry.TotalMemory)),
+				attribute.Int64("free_memory", int64(telemetry.FreeMemory)),
+				attribute.Int64("used_memory", int64(telemetry.UsedMemory)),
+			),
+		)
+		defer appendSpan.End()
 
 		if err := batch.Append(
 			telemetry.Timestamp.AsTime(),
@@ -44,19 +53,8 @@ func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetrie
 			telemetry.FreeMemory,
 			telemetry.UsedMemory,
 		); err != nil {
-			span.AddEvent("failed to append to batch",
-				trace.WithAttributes(
-					attribute.String("error", err.Error()),
-					attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
-					attribute.String("identifier", telemetry.Identifier),
-					attribute.Int64("total_memory", int64(telemetry.TotalMemory)),
-					attribute.Int64("free_memory", int64(telemetry.FreeMemory)),
-					attribute.Int64("used_memory", int64(telemetry.UsedMemory)),
-				),
-			)
-
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "failed to append to batch")
+			appendSpan.RecordError(err)
+			appendSpan.SetStatus(codes.Error, "failed to append to batch")
 
 			return errors.Join(errors.New("failed to append to batch"), err)
 		}
