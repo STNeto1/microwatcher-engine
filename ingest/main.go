@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/microwatcher/ingest/internal"
+	"github.com/microwatcher/shared/pkg/clickhouse"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
 	"github.com/microwatcher/shared/pkg/logger"
 
@@ -26,9 +27,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	localSource, err := clickhouse.NewLocalConnection(logger)
+	if err != nil {
+		logger.Error("failed to create local clickhouse connection",
+			slog.String("error", err.Error()),
+		)
+		os.Exit(1)
+	}
+
 	s := grpc.NewServer()
 	v1.RegisterTelemetryServiceServer(s, &internal.Server{
-		Logger: logger,
+		Logger:     logger,
+		Clickhouse: localSource,
 	})
 
 	logger.Info("Starting server...", slog.String("port", Port))
