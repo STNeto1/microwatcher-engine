@@ -6,6 +6,10 @@ import (
 
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
+	"github.com/microwatcher/shared/pkg/otlp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type Server struct {
@@ -15,16 +19,25 @@ type Server struct {
 }
 
 func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryRequest) (*v1.SendTelemetryResponse, error) {
-	if err := svc.Clickhouse.IngestV1Telemetries(ctx, req.Telemetries); err != nil {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "SendTelemetry",
+		trace.WithAttributes(attribute.String("method", "SendTelemetry")),
+		trace.WithAttributes(attribute.Int("batch size", len(req.Telemetries))),
+	)
+	defer span.End()
+
+	if err := svc.Clickhouse.IngestV1Telemetries(spanCtx, req.Telemetries); err != nil {
 		svc.Logger.Error("failed to ingest telemetries",
 			slog.String("error", err.Error()),
 		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to ingest telemetries")
 		return &v1.SendTelemetryResponse{Success: false}, nil
 	}
 
 	svc.Logger.Info("telemetries ingested",
 		slog.Int("size", len(req.Telemetries)),
 	)
+	span.SetStatus(codes.Ok, "ingested")
 
 	return &v1.SendTelemetryResponse{Success: true}, nil
 }

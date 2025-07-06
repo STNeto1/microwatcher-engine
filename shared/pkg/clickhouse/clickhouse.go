@@ -4,10 +4,15 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
+	"github.com/microwatcher/shared/pkg/otlp"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type ClickhouseSource struct {
@@ -15,13 +20,23 @@ type ClickhouseSource struct {
 }
 
 func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
-	batch, err := chs.Conn.PrepareBatch(ctx, "INSERT INTO memory_telemetries")
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "IngestV1Telemetries",
+		trace.WithAttributes(),
+	)
+	defer span.End()
+
+	batch, err := chs.Conn.PrepareBatch(spanCtx, "INSERT INTO memory_telemetries")
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to prepare batch")
+
 		return errors.Join(errors.New("failed to prepare batch"), err)
 	}
 	defer batch.Close()
 
 	for _, telemetry := range telemetries {
+		// TODO: maybe add a more granular span here
+
 		if err := batch.Append(
 			telemetry.Timestamp.AsTime(),
 			telemetry.Identifier,
@@ -29,13 +44,32 @@ func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetrie
 			telemetry.FreeMemory,
 			telemetry.UsedMemory,
 		); err != nil {
+			span.AddEvent("failed to append to batch",
+				trace.WithAttributes(
+					attribute.String("error", err.Error()),
+					attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+					attribute.String("identifier", telemetry.Identifier),
+					attribute.Int64("total_memory", int64(telemetry.TotalMemory)),
+					attribute.Int64("free_memory", int64(telemetry.FreeMemory)),
+					attribute.Int64("used_memory", int64(telemetry.UsedMemory)),
+				),
+			)
+
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "failed to append to batch")
+
 			return errors.Join(errors.New("failed to append to batch"), err)
 		}
 	}
 
 	if err := batch.Send(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to append to batch")
+
 		return errors.Join(errors.New("failed to send batch"), err)
 	}
+
+	span.SetStatus(codes.Ok, "ingested")
 
 	return nil
 }
