@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"os"
 
 	"github.com/microwatcher/ingest/internal"
+	"github.com/microwatcher/ingest/internal/otlp"
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
 	"github.com/microwatcher/shared/pkg/logger"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 
 	"google.golang.org/grpc"
 )
@@ -17,6 +20,9 @@ const Port = "50051"
 
 func main() {
 	logger := logger.NewDefaultLogger()
+
+	otelShutdown := otlp.InitTracer(context.Background(), logger)
+	defer otelShutdown()
 
 	lis, err := net.Listen("tcp", ":"+Port)
 	if err != nil {
@@ -35,7 +41,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	s := grpc.NewServer()
+	s := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+	)
 	v1.RegisterTelemetryServiceServer(s, &internal.Server{
 		Logger:     logger,
 		Clickhouse: localSource,
