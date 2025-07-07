@@ -15,7 +15,7 @@ import (
 
 func Start(ctx context.Context, config *config.Config) {
 	aliveTicker := time.NewTicker(time.Second * 5)
-	processTicker := time.NewTicker(config.Interval)
+	processTicker := time.NewTicker(config.MetricInterval)
 
 	client := internal.NewIngestClient("localhost:50051")
 

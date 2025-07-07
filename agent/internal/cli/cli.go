@@ -1,8 +1,9 @@
 package cli
 
 type Start struct {
-	Interval   string `help:"Interval between runs" default:"5s"`
-	Identifier string `help:"Agent identifier" default:"unknown"`
+	MetricInterval      string `help:"Interval between runs" default:"5s"`
+	Identifier          string `help:"Agent identifier" default:"unknown"`
+	HealthCheckInterval string `help:"Interval between health checks" default:"5s"`
 }
 
 type CLI struct {

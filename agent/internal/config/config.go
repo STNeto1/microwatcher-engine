@@ -9,16 +9,17 @@ import (
 const MinInterval = time.Second * 5
 
 type Config struct {
-	Logger     *slog.Logger
-	Interval   time.Duration
-	Identifier string
+	Logger              *slog.Logger
+	MetricInterval      time.Duration
+	HealthCheckInterval time.Duration
+	Identifier          string
 }
 
 func NewConfig(logger *slog.Logger) *Config {
 	return &Config{Logger: logger}
 }
 
-func (cfg *Config) SetInterval(val string) *Config {
+func (cfg *Config) SetMetricInterval(val string) *Config {
 	// TODO: maybe assert that val is not empty
 
 	fromString, err := time.ParseDuration(val)
@@ -30,7 +31,7 @@ func (cfg *Config) SetInterval(val string) *Config {
 		os.Exit(1)
 	}
 
-	cfg.Interval = fromString
+	cfg.MetricInterval = fromString
 
 	if fromString < MinInterval {
 		cfg.Logger.Warn(
@@ -38,7 +39,33 @@ func (cfg *Config) SetInterval(val string) *Config {
 			slog.String("value", val),
 			slog.String("default value", MinInterval.String()),
 		)
-		cfg.Interval = MinInterval
+		cfg.MetricInterval = MinInterval
+	}
+
+	return cfg
+}
+
+func (cfg *Config) SetHealthCheckInterval(val string) *Config {
+	// TODO: maybe assert that val is not empty
+
+	fromString, err := time.ParseDuration(val)
+	if err != nil {
+		cfg.Logger.Error("failed to parse duration",
+			slog.String("value", val),
+			slog.Any("error", err),
+		)
+		os.Exit(1)
+	}
+
+	cfg.HealthCheckInterval = fromString
+
+	if fromString < MinInterval {
+		cfg.Logger.Warn(
+			"duration is too low",
+			slog.String("value", val),
+			slog.String("default value", MinInterval.String()),
+		)
+		cfg.HealthCheckInterval = MinInterval
 	}
 
 	return cfg

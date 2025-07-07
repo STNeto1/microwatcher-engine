@@ -34,7 +34,8 @@ func main() {
 	case "start":
 		agentConfig := config.
 			NewConfig(jsonLogger).
-			SetInterval(cliArgs.Start.Interval).
+			SetMetricInterval(cliArgs.Start.MetricInterval).
+			SetHealthCheckInterval(cliArgs.Start.HealthCheckInterval).
 			SetIdentifier(cliArgs.Start.Identifier)
 
 		start.Start(ctx, agentConfig)
