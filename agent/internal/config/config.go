@@ -45,6 +45,26 @@ func (cfg *Config) SetInterval(val string) *Config {
 }
 
 func (cfg *Config) SetIdentifier(val string) *Config {
-	cfg.Identifier = val
+	// TODO: simplify this
+
+	if val == "unknown" {
+		// is the default value for the cli
+		hostname, err := os.Hostname()
+		if err != nil {
+			cfg.Logger.Error("failed to get hostname",
+				slog.Any("error", err),
+			)
+			cfg.Logger.Info("using default identifier",
+				slog.String("identifier", val),
+			)
+			// fallback to
+			cfg.Identifier = val
+		} else {
+			cfg.Identifier = hostname
+		}
+	} else {
+		cfg.Identifier = val
+	}
+
 	return cfg
 }
