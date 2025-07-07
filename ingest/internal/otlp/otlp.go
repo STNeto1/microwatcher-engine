@@ -13,7 +13,6 @@ import (
 	stdout "go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
-	"go.opentelemetry.io/otel/sdk/trace"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 )
@@ -24,7 +23,7 @@ const (
 	otlpEndpoint   = "api.axiom.co"          // OTLP collector endpoint.
 )
 
-func createExporter(logger *slog.Logger) (trace.SpanExporter, error) {
+func createExporter(logger *slog.Logger) (sdktrace.SpanExporter, error) {
 	if os.Getenv("AXIOM_TOKEN") == "" || os.Getenv("AXIOM_DATASET") == "" {
 		logger.Info("No AXIOM_TOKEN or AXIOM_DATASET found, using stdout exporter",
 			slog.String("env", "stdout"),

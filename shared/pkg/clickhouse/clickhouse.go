@@ -16,7 +16,8 @@ import (
 )
 
 type ClickhouseSource struct {
-	Conn driver.Conn
+	Conn   driver.Conn
+	Logger *slog.Logger
 }
 
 func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
@@ -32,7 +33,14 @@ func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, tele
 
 		return errors.Join(errors.New("failed to prepare batch"), err)
 	}
-	defer batch.Close()
+	defer func() {
+		if err := batch.Close(); err != nil {
+			span.RecordError(err)
+			chs.Logger.Error("failed to close batch",
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
 
 	for _, telemetry := range telemetries {
 		_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
@@ -85,7 +93,14 @@ func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, telemet
 
 		return errors.Join(errors.New("failed to prepare batch"), err)
 	}
-	defer batch.Close()
+	defer func() {
+		if err := batch.Close(); err != nil {
+			span.RecordError(err)
+			chs.Logger.Error("failed to close batch",
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
 
 	for _, telemetry := range telemetries {
 		_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
@@ -138,7 +153,14 @@ func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, telem
 
 		return errors.Join(errors.New("failed to prepare batch"), err)
 	}
-	defer batch.Close()
+	defer func() {
+		if err := batch.Close(); err != nil {
+			span.RecordError(err)
+			chs.Logger.Error("failed to close batch",
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
 
 	for _, telemetry := range telemetries {
 		for _, disk := range telemetry.Disks {
@@ -215,6 +237,7 @@ func NewLocalConnection(logger *slog.Logger) (*ClickhouseSource, error) {
 	}
 
 	return &ClickhouseSource{
-		Conn: conn,
+		Conn:   conn,
+		Logger: logger,
 	}, nil
 }
