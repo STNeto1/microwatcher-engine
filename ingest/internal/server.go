@@ -25,8 +25,18 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 	)
 	defer span.End()
 
-	if err := svc.Clickhouse.IngestV1Telemetries(spanCtx, req.Telemetries); err != nil {
-		svc.Logger.Error("failed to ingest telemetries",
+	// TODO: maybe retry or send to a "dead" queue to retry later
+	if err := svc.Clickhouse.IngestV1MemoryTelemetries(spanCtx, req.Telemetries); err != nil {
+		svc.Logger.Error("failed to ingest memory telemetries",
+			slog.String("error", err.Error()),
+		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to ingest telemetries")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
+
+	if err := svc.Clickhouse.IngestV1CPUTelemetries(spanCtx, req.Telemetries); err != nil {
+		svc.Logger.Error("failed to ingest cpu telemetries",
 			slog.String("error", err.Error()),
 		)
 		span.RecordError(err)

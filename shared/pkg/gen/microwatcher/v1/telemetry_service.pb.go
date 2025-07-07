@@ -29,6 +29,9 @@ type Telemetry struct {
 	TotalMemory   uint64                 `protobuf:"varint,3,opt,name=total_memory,json=totalMemory,proto3" json:"total_memory,omitempty"`
 	FreeMemory    uint64                 `protobuf:"varint,4,opt,name=free_memory,json=freeMemory,proto3" json:"free_memory,omitempty"`
 	UsedMemory    uint64                 `protobuf:"varint,5,opt,name=used_memory,json=usedMemory,proto3" json:"used_memory,omitempty"`
+	TotalCpu      float32                `protobuf:"fixed32,6,opt,name=total_cpu,json=totalCpu,proto3" json:"total_cpu,omitempty"`
+	FreeCpu       float32                `protobuf:"fixed32,7,opt,name=free_cpu,json=freeCpu,proto3" json:"free_cpu,omitempty"`
+	UsedCpu       float32                `protobuf:"fixed32,8,opt,name=used_cpu,json=usedCpu,proto3" json:"used_cpu,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -94,6 +97,27 @@ func (x *Telemetry) GetFreeMemory() uint64 {
 func (x *Telemetry) GetUsedMemory() uint64 {
 	if x != nil {
 		return x.UsedMemory
+	}
+	return 0
+}
+
+func (x *Telemetry) GetTotalCpu() float32 {
+	if x != nil {
+		return x.TotalCpu
+	}
+	return 0
+}
+
+func (x *Telemetry) GetFreeCpu() float32 {
+	if x != nil {
+		return x.FreeCpu
+	}
+	return 0
+}
+
+func (x *Telemetry) GetUsedCpu() float32 {
+	if x != nil {
+		return x.UsedCpu
 	}
 	return 0
 }
@@ -190,7 +214,7 @@ var File_microwatcher_v1_telemetry_service_proto protoreflect.FileDescriptor
 
 const file_microwatcher_v1_telemetry_service_proto_rawDesc = "" +
 	"\n" +
-	"'microwatcher/v1/telemetry_service.proto\x12\x0fmicrowatcher.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xca\x01\n" +
+	"'microwatcher/v1/telemetry_service.proto\x12\x0fmicrowatcher.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9d\x02\n" +
 	"\tTelemetry\x128\n" +
 	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1e\n" +
 	"\n" +
@@ -200,7 +224,10 @@ const file_microwatcher_v1_telemetry_service_proto_rawDesc = "" +
 	"\vfree_memory\x18\x04 \x01(\x04R\n" +
 	"freeMemory\x12\x1f\n" +
 	"\vused_memory\x18\x05 \x01(\x04R\n" +
-	"usedMemory\"T\n" +
+	"usedMemory\x12\x1b\n" +
+	"\ttotal_cpu\x18\x06 \x01(\x02R\btotalCpu\x12\x19\n" +
+	"\bfree_cpu\x18\a \x01(\x02R\afreeCpu\x12\x19\n" +
+	"\bused_cpu\x18\b \x01(\x02R\ausedCpu\"T\n" +
 	"\x14SendTelemetryRequest\x12<\n" +
 	"\vtelemetries\x18\x01 \x03(\v2\x1a.microwatcher.v1.TelemetryR\vtelemetries\"1\n" +
 	"\x15SendTelemetryResponse\x12\x18\n" +

@@ -48,6 +48,9 @@ func Start(ctx context.Context, config *config.Config) {
 					TotalMemory: runInfo.TotalMemory,
 					FreeMemory:  runInfo.FreeMemory,
 					UsedMemory:  runInfo.UsedMemory,
+					TotalCpu:    runInfo.TotalCPU,
+					FreeCpu:     runInfo.FreeCPU,
+					UsedCpu:     runInfo.UsedCPU,
 				})
 
 				if err := client.SendData(telemetries); err != nil {

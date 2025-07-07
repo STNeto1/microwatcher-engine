@@ -19,8 +19,8 @@ type ClickhouseSource struct {
 	Conn driver.Conn
 }
 
-func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
-	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1Telemetries",
+func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1MemoryTelemetries",
 		trace.WithAttributes(),
 	)
 	defer span.End()
@@ -52,6 +52,59 @@ func (chs *ClickhouseSource) IngestV1Telemetries(ctx context.Context, telemetrie
 			telemetry.TotalMemory,
 			telemetry.FreeMemory,
 			telemetry.UsedMemory,
+		); err != nil {
+			appendSpan.RecordError(err)
+			appendSpan.SetStatus(codes.Error, "failed to append to batch")
+
+			return errors.Join(errors.New("failed to append to batch"), err)
+		}
+	}
+
+	if err := batch.Send(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to append to batch")
+
+		return errors.Join(errors.New("failed to send batch"), err)
+	}
+
+	span.SetStatus(codes.Ok, "ingested")
+
+	return nil
+}
+
+func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1CPUTelemetries",
+		trace.WithAttributes(),
+	)
+	defer span.End()
+
+	batch, err := chs.Conn.PrepareBatch(spanCtx, "INSERT INTO cpu_telemetries")
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to prepare batch")
+
+		return errors.Join(errors.New("failed to prepare batch"), err)
+	}
+	defer batch.Close()
+
+	for _, telemetry := range telemetries {
+		_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
+			trace.WithAttributes(
+				attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+				attribute.String("identifier", telemetry.Identifier),
+				attribute.Float64("total_cpu", float64(telemetry.TotalCpu)),
+				attribute.Float64("free_cpu", float64(telemetry.FreeCpu)),
+				attribute.Float64("used_cpu", float64(telemetry.UsedCpu)),
+			),
+		)
+		defer appendSpan.End()
+
+		if err := batch.Append(
+			telemetry.Timestamp.AsTime(),
+			telemetry.Identifier,
+			telemetry.TotalCpu,
+			telemetry.FreeCpu,
+			telemetry.UsedCpu,
 		); err != nil {
 			appendSpan.RecordError(err)
 			appendSpan.SetStatus(codes.Error, "failed to append to batch")

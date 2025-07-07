@@ -12,6 +12,9 @@ message Telemetry {
   uint64 total_memory = 3;
   uint64 free_memory = 4;
   uint64 used_memory = 5;
+  float total_cpu = 6;
+  float free_cpu = 7;
+  float used_cpu = 8;
 }
 
 message SendTelemetryRequest {
@@ -25,4 +28,3 @@ message SendTelemetryResponse {
 service TelemetryService {
   rpc SendTelemetry(SendTelemetryRequest) returns (SendTelemetryResponse) {}
 }
-
