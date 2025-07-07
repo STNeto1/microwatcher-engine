@@ -7,7 +7,14 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
+	"github.com/shirou/gopsutil/net"
 )
+
+type SystemInformationNetwork struct {
+	Name      string
+	BytesSent uint64
+	BytesRecv uint64
+}
 
 type SystemInformationDisk struct {
 	Label      string
@@ -26,6 +33,7 @@ type SystemInformation struct {
 	FreeCPU     float32
 	UsedCPU     float32
 	Disks       []SystemInformationDisk
+	Networks    []SystemInformationNetwork
 }
 
 func GetSystemInformation(cfg *config.Config) SystemInformation {
@@ -59,6 +67,17 @@ func GetSystemInformation(cfg *config.Config) SystemInformation {
 		}
 	}
 
+	ioCounters, _ := net.IOCounters(false)
+	// TODO: assert it doesn't fail
+	networkStats := make([]SystemInformationNetwork, len(ioCounters))
+	for idx, nic := range ioCounters {
+		networkStats[idx] = SystemInformationNetwork{
+			Name:      nic.Name,
+			BytesSent: nic.BytesSent,
+			BytesRecv: nic.BytesRecv,
+		}
+	}
+
 	return SystemInformation{
 		Timestamp:   time.Now(),
 		TotalMemory: v.Total,
@@ -68,5 +87,6 @@ func GetSystemInformation(cfg *config.Config) SystemInformation {
 		FreeCPU:     float32(freeCPU),
 		UsedCPU:     float32(usedCPU),
 		Disks:       systemDisks,
+		Networks:    networkStats,
 	}
 }

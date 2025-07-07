@@ -53,6 +53,14 @@ func Start(ctx context.Context, config *config.Config) {
 					}
 				})
 
+				telemetryNetworks := iter.Map(runInfo.Networks, func(network systeminformation.SystemInformationNetwork) *v1.TelemetryNetwork {
+					return &v1.TelemetryNetwork{
+						Name:      network.Name,
+						BytesSent: network.BytesSent,
+						BytesRecv: network.BytesRecv,
+					}
+				})
+
 				telemetries = append(telemetries, &v1.Telemetry{
 					Timestamp:   timestamppb.Now(),
 					Identifier:  config.Identifier,
@@ -63,6 +71,7 @@ func Start(ctx context.Context, config *config.Config) {
 					FreeCpu:     runInfo.FreeCPU,
 					UsedCpu:     runInfo.UsedCPU,
 					Disks:       telemetryDisks,
+					Networks:    telemetryNetworks,
 				})
 
 				if err := client.SendData(telemetries); err != nil {

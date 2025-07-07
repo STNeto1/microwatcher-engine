@@ -207,6 +207,69 @@ func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, telem
 	return nil
 }
 
+func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1NetworksTelemetries",
+		trace.WithAttributes(),
+	)
+	defer span.End()
+
+	batch, err := chs.Conn.PrepareBatch(spanCtx, "INSERT INTO network_telemetries")
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to prepare batch")
+
+		return errors.Join(errors.New("failed to prepare batch"), err)
+	}
+	defer func() {
+		if err := batch.Close(); err != nil {
+			span.RecordError(err)
+			chs.Logger.Error("failed to close batch",
+				slog.String("error", err.Error()),
+			)
+		}
+	}()
+
+	for _, telemetry := range telemetries {
+		for _, nic := range telemetry.Networks {
+			_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
+				trace.WithAttributes(
+					attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+					attribute.String("identifier", telemetry.Identifier),
+					attribute.String("name", nic.Name),
+					attribute.Int64("bytes_sent", int64(nic.BytesSent)),
+					attribute.Int64("bytes_received", int64(nic.BytesRecv)),
+				),
+			)
+			defer appendSpan.End()
+
+			if err := batch.Append(
+				telemetry.Timestamp.AsTime(),
+				telemetry.Identifier,
+				nic.Name,
+				nic.BytesSent,
+				nic.BytesRecv,
+			); err != nil {
+				appendSpan.RecordError(err)
+				appendSpan.SetStatus(codes.Error, "failed to append to batch")
+
+				return errors.Join(errors.New("failed to append to batch"), err)
+			}
+		}
+
+	}
+
+	if err := batch.Send(); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to append to batch")
+
+		return errors.Join(errors.New("failed to send batch"), err)
+	}
+
+	span.SetStatus(codes.Ok, "ingested")
+
+	return nil
+}
+
 func NewLocalConnection(logger *slog.Logger) (*ClickhouseSource, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{"192.168.1.7:9000"},
