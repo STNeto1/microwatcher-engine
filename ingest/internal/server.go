@@ -18,6 +18,26 @@ type Server struct {
 	v1.UnimplementedTelemetryServiceServer
 }
 
+func (svc *Server) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) (*v1.Empty, error) {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "Server.HealthCheck",
+		trace.WithAttributes(attribute.String("method", "HealthCheck")),
+		trace.WithAttributes(),
+	)
+	defer span.End()
+
+	// TODO: maybe retry or send to a "dead" queue to retry later
+	if err := svc.Clickhouse.IngestV1HealthCheck(spanCtx, req); err != nil {
+		svc.Logger.Error("failed to ingest health check",
+			slog.String("error", err.Error()),
+		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to ingest health check")
+		return &v1.Empty{}, nil
+	}
+
+	return &v1.Empty{}, nil
+}
+
 func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryRequest) (*v1.SendTelemetryResponse, error) {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "Server.SendTelemetry",
 		trace.WithAttributes(attribute.String("method", "SendTelemetry")),

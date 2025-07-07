@@ -20,6 +20,30 @@ type ClickhouseSource struct {
 	Logger *slog.Logger
 }
 
+func (chs *ClickhouseSource) IngestV1HealthCheck(ctx context.Context, healthcheck *v1.HealthCheckRequest) error {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1HealthCheck",
+		trace.WithAttributes(
+			attribute.String("timestamp", healthcheck.Timestamp.AsTime().Format(time.RFC3339)),
+			attribute.String("identifier", healthcheck.Identifier),
+		),
+	)
+	defer span.End()
+
+	if err := chs.Conn.Exec(spanCtx, "INSERT INTO health_checks (timestamp, identifier) values (?, ?)",
+		healthcheck.Timestamp.AsTime(),
+		healthcheck.Identifier,
+	); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to prepare batch")
+
+		return errors.Join(errors.New("failed to prepare batch"), err)
+	}
+
+	span.SetStatus(codes.Ok, "ingested")
+
+	return nil
+}
+
 func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1MemoryTelemetries",
 		trace.WithAttributes(),

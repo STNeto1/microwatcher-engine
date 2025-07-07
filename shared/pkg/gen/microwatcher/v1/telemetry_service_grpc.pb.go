@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	TelemetryService_SendTelemetry_FullMethodName = "/microwatcher.v1.TelemetryService/SendTelemetry"
+	TelemetryService_HealthCheck_FullMethodName   = "/microwatcher.v1.TelemetryService/HealthCheck"
 )
 
 // TelemetryServiceClient is the client API for TelemetryService service.
@@ -27,6 +28,8 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type TelemetryServiceClient interface {
 	SendTelemetry(ctx context.Context, in *SendTelemetryRequest, opts ...grpc.CallOption) (*SendTelemetryResponse, error)
+	// i don't care about the response
+	HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*Empty, error)
 }
 
 type telemetryServiceClient struct {
@@ -47,11 +50,23 @@ func (c *telemetryServiceClient) SendTelemetry(ctx context.Context, in *SendTele
 	return out, nil
 }
 
+func (c *telemetryServiceClient) HealthCheck(ctx context.Context, in *HealthCheckRequest, opts ...grpc.CallOption) (*Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Empty)
+	err := c.cc.Invoke(ctx, TelemetryService_HealthCheck_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TelemetryServiceServer is the server API for TelemetryService service.
 // All implementations must embed UnimplementedTelemetryServiceServer
 // for forward compatibility.
 type TelemetryServiceServer interface {
 	SendTelemetry(context.Context, *SendTelemetryRequest) (*SendTelemetryResponse, error)
+	// i don't care about the response
+	HealthCheck(context.Context, *HealthCheckRequest) (*Empty, error)
 	mustEmbedUnimplementedTelemetryServiceServer()
 }
 
@@ -64,6 +79,9 @@ type UnimplementedTelemetryServiceServer struct{}
 
 func (UnimplementedTelemetryServiceServer) SendTelemetry(context.Context, *SendTelemetryRequest) (*SendTelemetryResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SendTelemetry not implemented")
+}
+func (UnimplementedTelemetryServiceServer) HealthCheck(context.Context, *HealthCheckRequest) (*Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method HealthCheck not implemented")
 }
 func (UnimplementedTelemetryServiceServer) mustEmbedUnimplementedTelemetryServiceServer() {}
 func (UnimplementedTelemetryServiceServer) testEmbeddedByValue()                          {}
@@ -104,6 +122,24 @@ func _TelemetryService_SendTelemetry_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TelemetryService_HealthCheck_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(HealthCheckRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TelemetryServiceServer).HealthCheck(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TelemetryService_HealthCheck_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TelemetryServiceServer).HealthCheck(ctx, req.(*HealthCheckRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TelemetryService_ServiceDesc is the grpc.ServiceDesc for TelemetryService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +150,10 @@ var TelemetryService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SendTelemetry",
 			Handler:    _TelemetryService_SendTelemetry_Handler,
+		},
+		{
+			MethodName: "HealthCheck",
+			Handler:    _TelemetryService_HealthCheck_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

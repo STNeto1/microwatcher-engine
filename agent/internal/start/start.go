@@ -28,7 +28,10 @@ func Start(ctx context.Context, config *config.Config) {
 			case <-ctx.Done():
 				return
 			case <-aliveTicker.C:
-				config.Logger.Info("i'm alive")
+				if err := client.HealthCheck(ctx, config.Identifier); err != nil {
+					config.Logger.Error("failed to health check", slog.String("error", err.Error()))
+					continue
+				}
 			}
 		}
 	}()

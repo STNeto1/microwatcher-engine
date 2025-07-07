@@ -13,6 +13,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type IngestClient struct {
@@ -57,6 +58,24 @@ func (ic *IngestClient) SendData(telemetries []*v1.Telemetry) error {
 
 	if !response.Success {
 		return errors.New("failed to send data")
+	}
+
+	return nil
+}
+
+func (ic *IngestClient) HealthCheck(ctx context.Context, identifier string) error {
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Second*2,
+	)
+	defer cancel()
+
+	_, err := ic.client.HealthCheck(ctx, &v1.HealthCheckRequest{
+		Timestamp:  timestamppb.Now(),
+		Identifier: identifier,
+	})
+	if err != nil {
+		return errors.Join(fmt.Errorf("failed to health check"), err)
 	}
 
 	return nil
