@@ -7,5 +7,6 @@ type Start struct {
 }
 
 type CLI struct {
-	Start Start `cmd:"" help:"Start agent"`
+	Start Start    `cmd:"" help:"Start agent"`
+	Check struct{} `cmd:"" help:"Check agent connection"`
 }

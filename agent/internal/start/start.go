@@ -13,6 +13,17 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+func Ping(ctx context.Context, config *config.Config) {
+	client := internal.NewIngestClient("localhost:50051")
+
+	if err := client.Ping(ctx); err != nil {
+		config.Logger.Error("failed to ping", slog.String("error", err.Error()))
+		return
+	}
+
+	config.Logger.Info("ping successful")
+}
+
 func Start(ctx context.Context, config *config.Config) {
 	aliveTicker := time.NewTicker(time.Second * 5)
 	processTicker := time.NewTicker(config.MetricInterval)

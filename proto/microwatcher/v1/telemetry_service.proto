@@ -9,6 +9,11 @@ option go_package = "github.com/microwatcher/shared/gen/microwatcher/v1;microwat
 // === GENERIC ===
 message Empty {}
 
+// === PING ===
+message PingRequest {}
+
+message PingResponse {}
+
 // === TELEMETRY ===
 message TelemetryNetwork {
   string name = 1;
@@ -56,4 +61,6 @@ service TelemetryService {
 
   // i don't care about the response
   rpc HealthCheck(HealthCheckRequest) returns (Empty) {}
+
+  rpc Ping(PingRequest) returns (PingResponse) {}
 }

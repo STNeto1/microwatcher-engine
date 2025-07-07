@@ -18,6 +18,16 @@ type Server struct {
 	v1.UnimplementedTelemetryServiceServer
 }
 
+func (svc *Server) Ping(ctx context.Context, req *v1.PingRequest) (*v1.PingResponse, error) {
+	_, span := otlp.IngestTracer.Start(ctx, "Server.Ping",
+		trace.WithAttributes(attribute.String("method", "Ping")),
+		trace.WithAttributes(),
+	)
+	defer span.End()
+
+	return &v1.PingResponse{}, nil
+}
+
 func (svc *Server) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) (*v1.Empty, error) {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "Server.HealthCheck",
 		trace.WithAttributes(attribute.String("method", "HealthCheck")),

@@ -80,3 +80,18 @@ func (ic *IngestClient) HealthCheck(ctx context.Context, identifier string) erro
 
 	return nil
 }
+
+func (ic *IngestClient) Ping(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(
+		ctx,
+		time.Second*2,
+	)
+	defer cancel()
+
+	_, err := ic.client.Ping(ctx, &v1.PingRequest{})
+	if err != nil {
+		return errors.Join(fmt.Errorf("failed to ping"), err)
+	}
+
+	return nil
+}

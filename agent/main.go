@@ -30,14 +30,17 @@ func main() {
 			Summary: true,
 		}),
 	)
-	switch kongCtx.Command() {
-	case "start":
-		agentConfig := config.
-			NewConfig(jsonLogger).
-			SetMetricInterval(cliArgs.Start.MetricInterval).
-			SetHealthCheckInterval(cliArgs.Start.HealthCheckInterval).
-			SetIdentifier(cliArgs.Start.Identifier)
 
+	agentConfig := config.
+		NewConfig(jsonLogger).
+		SetMetricInterval(cliArgs.Start.MetricInterval).
+		SetHealthCheckInterval(cliArgs.Start.HealthCheckInterval).
+		SetIdentifier(cliArgs.Start.Identifier)
+
+	switch kongCtx.Command() {
+	case "check":
+		start.Ping(ctx, agentConfig)
+	case "start":
 		start.Start(ctx, agentConfig)
 	default:
 		panic(kongCtx.Command())
