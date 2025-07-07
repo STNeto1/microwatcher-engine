@@ -22,6 +22,82 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type TelemetryDisk struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Label         string                 `protobuf:"bytes,1,opt,name=label,proto3" json:"label,omitempty"`
+	Mountpoint    string                 `protobuf:"bytes,2,opt,name=mountpoint,proto3" json:"mountpoint,omitempty"`
+	Total         uint64                 `protobuf:"varint,3,opt,name=total,proto3" json:"total,omitempty"`
+	Free          uint64                 `protobuf:"varint,4,opt,name=free,proto3" json:"free,omitempty"`
+	Used          uint64                 `protobuf:"varint,5,opt,name=used,proto3" json:"used,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TelemetryDisk) Reset() {
+	*x = TelemetryDisk{}
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TelemetryDisk) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TelemetryDisk) ProtoMessage() {}
+
+func (x *TelemetryDisk) ProtoReflect() protoreflect.Message {
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TelemetryDisk.ProtoReflect.Descriptor instead.
+func (*TelemetryDisk) Descriptor() ([]byte, []int) {
+	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *TelemetryDisk) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *TelemetryDisk) GetMountpoint() string {
+	if x != nil {
+		return x.Mountpoint
+	}
+	return ""
+}
+
+func (x *TelemetryDisk) GetTotal() uint64 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *TelemetryDisk) GetFree() uint64 {
+	if x != nil {
+		return x.Free
+	}
+	return 0
+}
+
+func (x *TelemetryDisk) GetUsed() uint64 {
+	if x != nil {
+		return x.Used
+	}
+	return 0
+}
+
 type Telemetry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Timestamp     *timestamppb.Timestamp `protobuf:"bytes,1,opt,name=timestamp,proto3" json:"timestamp,omitempty"`
@@ -32,13 +108,14 @@ type Telemetry struct {
 	TotalCpu      float32                `protobuf:"fixed32,6,opt,name=total_cpu,json=totalCpu,proto3" json:"total_cpu,omitempty"`
 	FreeCpu       float32                `protobuf:"fixed32,7,opt,name=free_cpu,json=freeCpu,proto3" json:"free_cpu,omitempty"`
 	UsedCpu       float32                `protobuf:"fixed32,8,opt,name=used_cpu,json=usedCpu,proto3" json:"used_cpu,omitempty"`
+	Disks         []*TelemetryDisk       `protobuf:"bytes,9,rep,name=disks,proto3" json:"disks,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Telemetry) Reset() {
 	*x = Telemetry{}
-	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[0]
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -50,7 +127,7 @@ func (x *Telemetry) String() string {
 func (*Telemetry) ProtoMessage() {}
 
 func (x *Telemetry) ProtoReflect() protoreflect.Message {
-	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[0]
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -63,7 +140,7 @@ func (x *Telemetry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Telemetry.ProtoReflect.Descriptor instead.
 func (*Telemetry) Descriptor() ([]byte, []int) {
-	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{0}
+	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *Telemetry) GetTimestamp() *timestamppb.Timestamp {
@@ -122,6 +199,13 @@ func (x *Telemetry) GetUsedCpu() float32 {
 	return 0
 }
 
+func (x *Telemetry) GetDisks() []*TelemetryDisk {
+	if x != nil {
+		return x.Disks
+	}
+	return nil
+}
+
 type SendTelemetryRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Telemetries   []*Telemetry           `protobuf:"bytes,1,rep,name=telemetries,proto3" json:"telemetries,omitempty"`
@@ -131,7 +215,7 @@ type SendTelemetryRequest struct {
 
 func (x *SendTelemetryRequest) Reset() {
 	*x = SendTelemetryRequest{}
-	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[1]
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -143,7 +227,7 @@ func (x *SendTelemetryRequest) String() string {
 func (*SendTelemetryRequest) ProtoMessage() {}
 
 func (x *SendTelemetryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[1]
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -156,7 +240,7 @@ func (x *SendTelemetryRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendTelemetryRequest.ProtoReflect.Descriptor instead.
 func (*SendTelemetryRequest) Descriptor() ([]byte, []int) {
-	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{1}
+	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *SendTelemetryRequest) GetTelemetries() []*Telemetry {
@@ -175,7 +259,7 @@ type SendTelemetryResponse struct {
 
 func (x *SendTelemetryResponse) Reset() {
 	*x = SendTelemetryResponse{}
-	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[2]
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -187,7 +271,7 @@ func (x *SendTelemetryResponse) String() string {
 func (*SendTelemetryResponse) ProtoMessage() {}
 
 func (x *SendTelemetryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[2]
+	mi := &file_microwatcher_v1_telemetry_service_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -200,7 +284,7 @@ func (x *SendTelemetryResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendTelemetryResponse.ProtoReflect.Descriptor instead.
 func (*SendTelemetryResponse) Descriptor() ([]byte, []int) {
-	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{2}
+	return file_microwatcher_v1_telemetry_service_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *SendTelemetryResponse) GetSuccess() bool {
@@ -214,7 +298,15 @@ var File_microwatcher_v1_telemetry_service_proto protoreflect.FileDescriptor
 
 const file_microwatcher_v1_telemetry_service_proto_rawDesc = "" +
 	"\n" +
-	"'microwatcher/v1/telemetry_service.proto\x12\x0fmicrowatcher.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x9d\x02\n" +
+	"'microwatcher/v1/telemetry_service.proto\x12\x0fmicrowatcher.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\x83\x01\n" +
+	"\rTelemetryDisk\x12\x14\n" +
+	"\x05label\x18\x01 \x01(\tR\x05label\x12\x1e\n" +
+	"\n" +
+	"mountpoint\x18\x02 \x01(\tR\n" +
+	"mountpoint\x12\x14\n" +
+	"\x05total\x18\x03 \x01(\x04R\x05total\x12\x12\n" +
+	"\x04free\x18\x04 \x01(\x04R\x04free\x12\x12\n" +
+	"\x04used\x18\x05 \x01(\x04R\x04used\"\xd3\x02\n" +
 	"\tTelemetry\x128\n" +
 	"\ttimestamp\x18\x01 \x01(\v2\x1a.google.protobuf.TimestampR\ttimestamp\x12\x1e\n" +
 	"\n" +
@@ -227,7 +319,8 @@ const file_microwatcher_v1_telemetry_service_proto_rawDesc = "" +
 	"usedMemory\x12\x1b\n" +
 	"\ttotal_cpu\x18\x06 \x01(\x02R\btotalCpu\x12\x19\n" +
 	"\bfree_cpu\x18\a \x01(\x02R\afreeCpu\x12\x19\n" +
-	"\bused_cpu\x18\b \x01(\x02R\ausedCpu\"T\n" +
+	"\bused_cpu\x18\b \x01(\x02R\ausedCpu\x124\n" +
+	"\x05disks\x18\t \x03(\v2\x1e.microwatcher.v1.TelemetryDiskR\x05disks\"T\n" +
 	"\x14SendTelemetryRequest\x12<\n" +
 	"\vtelemetries\x18\x01 \x03(\v2\x1a.microwatcher.v1.TelemetryR\vtelemetries\"1\n" +
 	"\x15SendTelemetryResponse\x12\x18\n" +
@@ -247,23 +340,25 @@ func file_microwatcher_v1_telemetry_service_proto_rawDescGZIP() []byte {
 	return file_microwatcher_v1_telemetry_service_proto_rawDescData
 }
 
-var file_microwatcher_v1_telemetry_service_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_microwatcher_v1_telemetry_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_microwatcher_v1_telemetry_service_proto_goTypes = []any{
-	(*Telemetry)(nil),             // 0: microwatcher.v1.Telemetry
-	(*SendTelemetryRequest)(nil),  // 1: microwatcher.v1.SendTelemetryRequest
-	(*SendTelemetryResponse)(nil), // 2: microwatcher.v1.SendTelemetryResponse
-	(*timestamppb.Timestamp)(nil), // 3: google.protobuf.Timestamp
+	(*TelemetryDisk)(nil),         // 0: microwatcher.v1.TelemetryDisk
+	(*Telemetry)(nil),             // 1: microwatcher.v1.Telemetry
+	(*SendTelemetryRequest)(nil),  // 2: microwatcher.v1.SendTelemetryRequest
+	(*SendTelemetryResponse)(nil), // 3: microwatcher.v1.SendTelemetryResponse
+	(*timestamppb.Timestamp)(nil), // 4: google.protobuf.Timestamp
 }
 var file_microwatcher_v1_telemetry_service_proto_depIdxs = []int32{
-	3, // 0: microwatcher.v1.Telemetry.timestamp:type_name -> google.protobuf.Timestamp
-	0, // 1: microwatcher.v1.SendTelemetryRequest.telemetries:type_name -> microwatcher.v1.Telemetry
-	1, // 2: microwatcher.v1.TelemetryService.SendTelemetry:input_type -> microwatcher.v1.SendTelemetryRequest
-	2, // 3: microwatcher.v1.TelemetryService.SendTelemetry:output_type -> microwatcher.v1.SendTelemetryResponse
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 0: microwatcher.v1.Telemetry.timestamp:type_name -> google.protobuf.Timestamp
+	0, // 1: microwatcher.v1.Telemetry.disks:type_name -> microwatcher.v1.TelemetryDisk
+	1, // 2: microwatcher.v1.SendTelemetryRequest.telemetries:type_name -> microwatcher.v1.Telemetry
+	2, // 3: microwatcher.v1.TelemetryService.SendTelemetry:input_type -> microwatcher.v1.SendTelemetryRequest
+	3, // 4: microwatcher.v1.TelemetryService.SendTelemetry:output_type -> microwatcher.v1.SendTelemetryResponse
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_microwatcher_v1_telemetry_service_proto_init() }
@@ -277,7 +372,7 @@ func file_microwatcher_v1_telemetry_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_microwatcher_v1_telemetry_service_proto_rawDesc), len(file_microwatcher_v1_telemetry_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

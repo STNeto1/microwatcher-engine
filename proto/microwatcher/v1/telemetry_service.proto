@@ -6,6 +6,14 @@ import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/microwatcher/shared/gen/microwatcher/v1;microwatcherv1";
 
+message TelemetryDisk {
+  string label = 1;
+  string mountpoint = 2;
+  uint64 total = 3;
+  uint64 free = 4;
+  uint64 used = 5;
+}
+
 message Telemetry {
   google.protobuf.Timestamp timestamp = 1;
   string identifier = 2;
@@ -15,6 +23,7 @@ message Telemetry {
   float total_cpu = 6;
   float free_cpu = 7;
   float used_cpu = 8;
+  repeated TelemetryDisk disks = 9;
 }
 
 message SendTelemetryRequest {

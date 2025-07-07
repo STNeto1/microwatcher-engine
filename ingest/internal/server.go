@@ -44,6 +44,15 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 		return &v1.SendTelemetryResponse{Success: false}, nil
 	}
 
+	if err := svc.Clickhouse.IngestV1DisksTelemetries(spanCtx, req.Telemetries); err != nil {
+		svc.Logger.Error("failed to ingest disks telemetries",
+			slog.String("error", err.Error()),
+		)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to ingest telemetries")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
+
 	svc.Logger.Info("telemetries ingested",
 		slog.Int("size", len(req.Telemetries)),
 	)

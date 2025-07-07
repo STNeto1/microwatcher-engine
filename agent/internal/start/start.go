@@ -9,6 +9,7 @@ import (
 	"github.com/microwatcher/agent/internal/config"
 	"github.com/microwatcher/agent/internal/systeminformation"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
+	"github.com/microwatcher/shared/pkg/iter"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -42,6 +43,16 @@ func Start(ctx context.Context, config *config.Config) {
 			case <-processTicker.C:
 				runInfo := systeminformation.GetSystemInformation(config)
 
+				telemetryDisks := iter.Map(runInfo.Disks, func(disk systeminformation.SystemInformationDisk) *v1.TelemetryDisk {
+					return &v1.TelemetryDisk{
+						Label:      disk.Label,
+						Mountpoint: disk.Mountpoint,
+						Total:      disk.Total,
+						Used:       disk.Used,
+						Free:       disk.Free,
+					}
+				})
+
 				telemetries = append(telemetries, &v1.Telemetry{
 					Timestamp:   timestamppb.Now(),
 					Identifier:  config.Identifier,
@@ -51,6 +62,7 @@ func Start(ctx context.Context, config *config.Config) {
 					TotalCpu:    runInfo.TotalCPU,
 					FreeCpu:     runInfo.FreeCPU,
 					UsedCpu:     runInfo.UsedCPU,
+					Disks:       telemetryDisks,
 				})
 
 				if err := client.SendData(telemetries); err != nil {
