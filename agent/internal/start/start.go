@@ -14,7 +14,7 @@ import (
 )
 
 func Ping(ctx context.Context, config *config.Config) {
-	client := internal.NewIngestClient("localhost:50051")
+	client := internal.NewIngestClient("localhost:50051", config)
 
 	if err := client.Ping(ctx); err != nil {
 		config.Logger.Error("failed to ping", slog.String("error", err.Error()))
@@ -28,7 +28,7 @@ func Start(ctx context.Context, config *config.Config) {
 	aliveTicker := time.NewTicker(time.Second * 5)
 	processTicker := time.NewTicker(config.MetricInterval)
 
-	client := internal.NewIngestClient("localhost:50051")
+	client := internal.NewIngestClient("localhost:50051", config)
 
 	defer aliveTicker.Stop()
 	defer processTicker.Stop()

@@ -2,14 +2,21 @@ package internal
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"log/slog"
 
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
 	"github.com/microwatcher/shared/pkg/otlp"
+	"github.com/samborkent/uuidv7"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 )
 
 type Server struct {
@@ -18,12 +25,94 @@ type Server struct {
 	v1.UnimplementedTelemetryServiceServer
 }
 
+func extractHeader(md metadata.MD, key string) string {
+	values := md.Get(key)
+	if len(values) == 0 {
+		return ""
+	}
+
+	return values[0]
+}
+
 func (svc *Server) Ping(ctx context.Context, req *v1.PingRequest) (*v1.PingResponse, error) {
-	_, span := otlp.IngestTracer.Start(ctx, "Server.Ping",
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "Server.Ping",
 		trace.WithAttributes(attribute.String("method", "Ping")),
 		trace.WithAttributes(),
 	)
 	defer span.End()
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		svc.Logger.Error("failed to get metadata")
+
+		span.RecordError(fmt.Errorf("failed to get metadata"))
+		span.SetStatus(codes.Error, "failed to get metadata")
+		return nil, fmt.Errorf("failed to get metadata")
+	}
+
+	signature := extractHeader(md, "x-signature")
+	clientID := extractHeader(md, "x-client-id")
+
+	if signature == "" || clientID == "" {
+		svc.Logger.Error("missing credentials from request")
+
+		span.RecordError(fmt.Errorf("missing credentials"))
+		span.SetStatus(codes.Error, "missing credentials")
+		return nil, fmt.Errorf("missing credentials")
+	}
+
+	if valid := uuidv7.IsValidString(clientID); !valid {
+		svc.Logger.Error("invalid client id",
+			slog.String("clientID", clientID),
+		)
+
+		span.RecordError(fmt.Errorf("invalid client id"))
+		span.SetStatus(codes.Error, "invalid client id")
+		return nil, fmt.Errorf("invalid client id")
+	}
+
+	payloadBytes, err := proto.Marshal(req)
+	if err != nil {
+		svc.Logger.Error("failed to marshal ping request",
+			slog.String("error", err.Error()),
+		)
+
+		span.RecordError(fmt.Errorf("failed to marshal"))
+		span.SetStatus(codes.Error, "failed to marshal")
+		return nil, fmt.Errorf("failed to marshal")
+	}
+
+	deviceInfo, err := svc.Clickhouse.FindDeviceByID(spanCtx, clientID)
+	if err != nil {
+		svc.Logger.Error("failed to find client",
+			slog.String("error", err.Error()),
+		)
+
+		span.RecordError(fmt.Errorf("failed to find client"))
+		span.SetStatus(codes.Error, "failed to find client")
+		return nil, fmt.Errorf("failed to find client")
+	}
+
+	mac := hmac.New(sha256.New, []byte(deviceInfo.Secret))
+	mac.Write(payloadBytes)
+	expectedSig := mac.Sum(nil)
+	expectedSigHex := hex.EncodeToString(expectedSig)
+
+	if !hmac.Equal([]byte(signature), []byte(expectedSigHex)) {
+		svc.Logger.Error("invalid signature",
+			slog.String("signature", signature),
+			slog.String("expected", expectedSigHex),
+		)
+
+		span.RecordError(fmt.Errorf("invalid signature"))
+		span.SetStatus(codes.Error, "invalid signature")
+		return nil, fmt.Errorf("invalid signature")
+	}
+
+	svc.Logger.Info("ping received",
+		slog.Any("signature", signature),
+		slog.Any("clientID", clientID),
+	)
 
 	return &v1.PingResponse{}, nil
 }
@@ -54,6 +143,47 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 		trace.WithAttributes(attribute.Int("batch size", len(req.Telemetries))),
 	)
 	defer span.End()
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		span.RecordError(fmt.Errorf("failed to get metadata"))
+		span.SetStatus(codes.Error, "failed to get metadata")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
+
+	signature := md.Get("x-signature")
+	if len(signature) == 0 {
+		span.RecordError(fmt.Errorf("missing signature"))
+		span.SetStatus(codes.Error, "missing signature")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
+	receivedSigHex := signature[0]
+
+	if len(req.Telemetries) == 0 {
+		span.RecordError(fmt.Errorf("no telemetries"))
+		span.SetStatus(codes.Error, "no telemetries")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
+
+	deviceSecret := []byte("")
+
+	payloadBytes, err := proto.Marshal(req)
+	if err != nil {
+		span.RecordError(fmt.Errorf("failed to marshal telemetry: %w", err))
+		span.SetStatus(codes.Error, "failed to marshal telemetry")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
+
+	mac := hmac.New(sha256.New, deviceSecret)
+	mac.Write(payloadBytes)
+	expectedSig := mac.Sum(nil)
+	expectedSigHex := hex.EncodeToString(expectedSig)
+
+	if !hmac.Equal([]byte(receivedSigHex), []byte(expectedSigHex)) {
+		span.RecordError(fmt.Errorf("invalid signature"))
+		span.SetStatus(codes.Error, "invalid signature")
+		return &v1.SendTelemetryResponse{Success: false}, nil
+	}
 
 	// TODO: maybe retry or send to a "dead" queue to retry later
 	if err := svc.Clickhouse.IngestV1MemoryTelemetries(spanCtx, req.Telemetries); err != nil {

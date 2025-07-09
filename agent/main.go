@@ -6,11 +6,10 @@ import (
 	"os"
 	"os/signal"
 
+	"github.com/alecthomas/kong"
 	"github.com/microwatcher/agent/internal/cli"
 	"github.com/microwatcher/agent/internal/config"
 	"github.com/microwatcher/agent/internal/start"
-
-	"github.com/alecthomas/kong"
 )
 
 func main() {
@@ -32,18 +31,16 @@ func main() {
 	)
 
 	agentConfig := config.
-		NewConfig(jsonLogger).
-		SetMetricInterval(cliArgs.Start.MetricInterval).
-		SetHealthCheckInterval(cliArgs.Start.HealthCheckInterval).
-		SetIdentifier(cliArgs.Start.Identifier)
+		NewConfig(jsonLogger)
 
 	switch kongCtx.Command() {
 	case "check":
+		agentConfig.ApplyCheckOverrides(cliArgs.Check)
 		start.Ping(ctx, agentConfig)
 	case "start":
+		agentConfig.ApplyStartOverrides(cliArgs.Start)
 		start.Start(ctx, agentConfig)
 	default:
 		panic(kongCtx.Command())
 	}
-
 }

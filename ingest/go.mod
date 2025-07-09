@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/microwatcher/shared v0.0.0-00010101000000-000000000000
+	github.com/samborkent/uuidv7 v0.0.0-20231110121620-f2e19d87e48b
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.62.0
 	go.opentelemetry.io/otel v1.37.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp v1.37.0
@@ -12,6 +13,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.37.0
 	go.opentelemetry.io/otel/trace v1.37.0
 	google.golang.org/grpc v1.73.0
+	google.golang.org/protobuf v1.36.6
 )
 
 replace github.com/microwatcher/shared => ../shared
@@ -41,6 +43,5 @@ require (
 	golang.org/x/text v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250603155806-513f23925822 // indirect
-	google.golang.org/protobuf v1.36.6 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

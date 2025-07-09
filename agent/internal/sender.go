@@ -2,27 +2,35 @@ package internal
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"log/slog"
 	"os"
 	"time"
 
+	"github.com/microwatcher/agent/internal/config"
 	v1 "github.com/microwatcher/shared/pkg/gen/microwatcher/v1"
 	"github.com/microwatcher/shared/pkg/logger"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type IngestClient struct {
-	client v1.TelemetryServiceClient
-	conn   *grpc.ClientConn
-	Logger *slog.Logger
+	client       v1.TelemetryServiceClient
+	conn         *grpc.ClientConn
+	Logger       *slog.Logger
+	ClientID     string
+	ClientSecret []byte
 }
 
-func NewIngestClient(addr string) *IngestClient {
+func NewIngestClient(addr string, cfg *config.Config) *IngestClient {
 	defaultLogger := logger.NewDefaultLogger()
 	conn, err := grpc.NewClient(
 		addr,
@@ -36,9 +44,11 @@ func NewIngestClient(addr string) *IngestClient {
 	client := v1.NewTelemetryServiceClient(conn)
 
 	return &IngestClient{
-		Logger: defaultLogger,
-		client: client,
-		conn:   conn,
+		Logger:       defaultLogger,
+		client:       client,
+		conn:         conn,
+		ClientID:     cfg.ClientID,
+		ClientSecret: cfg.ClientSecret,
 	}
 }
 
@@ -49,9 +59,26 @@ func (ic *IngestClient) SendData(telemetries []*v1.Telemetry) error {
 	)
 	defer cancel()
 
-	response, err := ic.client.SendTelemetry(ctx, &v1.SendTelemetryRequest{
+	req := &v1.SendTelemetryRequest{
 		Telemetries: telemetries,
+	}
+
+	payloadBytes, err := proto.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal telemetry: %w", err)
+	}
+
+	mac := hmac.New(sha256.New, ic.ClientSecret)
+	mac.Write(payloadBytes)
+	signature := mac.Sum(nil)
+	signatureHex := hex.EncodeToString(signature)
+
+	md := metadata.New(map[string]string{
+		"x-signature": signatureHex,
 	})
+	ctx = metadata.NewOutgoingContext(ctx, md)
+
+	response, err := ic.client.SendTelemetry(ctx, req)
 	if err != nil {
 		return errors.Join(fmt.Errorf("failed to send data"), err)
 	}
@@ -88,7 +115,24 @@ func (ic *IngestClient) Ping(ctx context.Context) error {
 	)
 	defer cancel()
 
-	_, err := ic.client.Ping(ctx, &v1.PingRequest{})
+	req := &v1.PingRequest{}
+
+	payloadBytes, err := proto.Marshal(req)
+	if err != nil {
+		return fmt.Errorf("failed to marshal telemetry: %w", err)
+	}
+
+	mac := hmac.New(sha256.New, ic.ClientSecret)
+	mac.Write(payloadBytes)
+	signature := mac.Sum(nil)
+	signatureHex := hex.EncodeToString(signature)
+
+	md := metadata.New(map[string]string{
+		"x-signature": signatureHex,
+		"x-client-id": ic.ClientID,
+	})
+
+	_, err = ic.client.Ping(metadata.NewOutgoingContext(ctx, md), req)
 	if err != nil {
 		return errors.Join(fmt.Errorf("failed to ping"), err)
 	}

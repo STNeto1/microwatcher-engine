@@ -294,6 +294,27 @@ func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, te
 	return nil
 }
 
+func (chs *ClickhouseSource) FindDeviceByID(ctx context.Context, deviceID string) (*ClickhouseDevice, error) {
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.FindDeviceBySecret",
+		trace.WithAttributes(
+			attribute.String("deviceID", deviceID),
+		),
+	)
+	defer span.End()
+
+	var device ClickhouseDevice
+	if err := chs.Conn.QueryRow(spanCtx, "SELECT id, label, secret FROM devices WHERE id = ? LIMIT 1", deviceID).ScanStruct(&device); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to query")
+
+		return nil, errors.Join(errors.New("failed to query"), err)
+	}
+
+	span.SetStatus(codes.Ok, "found device")
+
+	return &device, nil
+}
+
 func NewLocalConnection(logger *slog.Logger) (*ClickhouseSource, error) {
 	conn, err := clickhouse.Open(&clickhouse.Options{
 		Addr: []string{"192.168.1.7:9000"},
