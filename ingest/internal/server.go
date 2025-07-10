@@ -175,7 +175,7 @@ func (svc *Server) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) 
 	}
 
 	// TODO: maybe retry or send to a "dead" queue to retry later
-	if err := svc.Clickhouse.IngestV1HealthCheck(spanCtx, req); err != nil {
+	if err := svc.Clickhouse.IngestV1HealthCheck(spanCtx, deviceID, req); err != nil {
 		svc.Logger.Error("failed to ingest health check",
 			slog.String("error", err.Error()),
 		)
@@ -208,7 +208,7 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 	}
 
 	// TODO: maybe retry or send to a "dead" queue to retry later
-	if err := svc.Clickhouse.IngestV1MemoryTelemetries(spanCtx, req.Telemetries); err != nil {
+	if err := svc.Clickhouse.IngestV1MemoryTelemetries(spanCtx, deviceID, req.Telemetries); err != nil {
 		svc.Logger.Error("failed to ingest memory telemetries",
 			slog.String("error", err.Error()),
 		)
@@ -217,7 +217,7 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 		return &v1.SendTelemetryResponse{Success: false}, nil
 	}
 
-	if err := svc.Clickhouse.IngestV1CPUTelemetries(spanCtx, req.Telemetries); err != nil {
+	if err := svc.Clickhouse.IngestV1CPUTelemetries(spanCtx, deviceID, req.Telemetries); err != nil {
 		svc.Logger.Error("failed to ingest cpu telemetries",
 			slog.String("error", err.Error()),
 		)
@@ -226,7 +226,7 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 		return &v1.SendTelemetryResponse{Success: false}, nil
 	}
 
-	if err := svc.Clickhouse.IngestV1DisksTelemetries(spanCtx, req.Telemetries); err != nil {
+	if err := svc.Clickhouse.IngestV1DisksTelemetries(spanCtx, deviceID, req.Telemetries); err != nil {
 		svc.Logger.Error("failed to ingest disks telemetries",
 			slog.String("error", err.Error()),
 		)
@@ -235,7 +235,7 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 		return &v1.SendTelemetryResponse{Success: false}, nil
 	}
 
-	if err := svc.Clickhouse.IngestV1NetworksTelemetries(spanCtx, req.Telemetries); err != nil {
+	if err := svc.Clickhouse.IngestV1NetworksTelemetries(spanCtx, deviceID, req.Telemetries); err != nil {
 		svc.Logger.Error("failed to ingest networks telemetries",
 			slog.String("error", err.Error()),
 		)

@@ -20,17 +20,19 @@ type ClickhouseSource struct {
 	Logger *slog.Logger
 }
 
-func (chs *ClickhouseSource) IngestV1HealthCheck(ctx context.Context, healthcheck *v1.HealthCheckRequest) error {
+func (chs *ClickhouseSource) IngestV1HealthCheck(ctx context.Context, deviceID string, healthcheck *v1.HealthCheckRequest) error {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1HealthCheck",
 		trace.WithAttributes(
 			attribute.String("timestamp", healthcheck.Timestamp.AsTime().Format(time.RFC3339)),
 			attribute.String("identifier", healthcheck.Identifier),
+			attribute.String("deviceID", deviceID),
 		),
 	)
 	defer span.End()
 
-	if err := chs.Conn.Exec(spanCtx, "INSERT INTO health_checks (timestamp, identifier) values (?, ?)",
+	if err := chs.Conn.Exec(spanCtx, "INSERT INTO health_checks (timestamp, device_id, identifier) values (?, ?, ?)",
 		healthcheck.Timestamp.AsTime(),
+		deviceID,
 		healthcheck.Identifier,
 	); err != nil {
 		span.RecordError(err)
@@ -44,9 +46,11 @@ func (chs *ClickhouseSource) IngestV1HealthCheck(ctx context.Context, healthchec
 	return nil
 }
 
-func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, deviceID string, telemetries []*v1.Telemetry) error {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1MemoryTelemetries",
-		trace.WithAttributes(),
+		trace.WithAttributes(
+			attribute.String("deviceID", deviceID),
+		),
 	)
 	defer span.End()
 
@@ -70,6 +74,7 @@ func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, tele
 		_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
 			trace.WithAttributes(
 				attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+				attribute.String("deviceID", deviceID),
 				attribute.String("identifier", telemetry.Identifier),
 				attribute.Int64("total_memory", int64(telemetry.TotalMemory)),
 				attribute.Int64("free_memory", int64(telemetry.FreeMemory)),
@@ -80,6 +85,7 @@ func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, tele
 
 		if err := batch.Append(
 			telemetry.Timestamp.AsTime(),
+			deviceID,
 			telemetry.Identifier,
 			telemetry.TotalMemory,
 			telemetry.FreeMemory,
@@ -104,9 +110,11 @@ func (chs *ClickhouseSource) IngestV1MemoryTelemetries(ctx context.Context, tele
 	return nil
 }
 
-func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, deviceID string, telemetries []*v1.Telemetry) error {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1CPUTelemetries",
-		trace.WithAttributes(),
+		trace.WithAttributes(
+			attribute.String("deviceID", deviceID),
+		),
 	)
 	defer span.End()
 
@@ -130,6 +138,7 @@ func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, telemet
 		_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
 			trace.WithAttributes(
 				attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+				attribute.String("deviceID", deviceID),
 				attribute.String("identifier", telemetry.Identifier),
 				attribute.Float64("total_cpu", float64(telemetry.TotalCpu)),
 				attribute.Float64("free_cpu", float64(telemetry.FreeCpu)),
@@ -140,6 +149,7 @@ func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, telemet
 
 		if err := batch.Append(
 			telemetry.Timestamp.AsTime(),
+			deviceID,
 			telemetry.Identifier,
 			telemetry.TotalCpu,
 			telemetry.FreeCpu,
@@ -164,9 +174,11 @@ func (chs *ClickhouseSource) IngestV1CPUTelemetries(ctx context.Context, telemet
 	return nil
 }
 
-func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, deviceID string, telemetries []*v1.Telemetry) error {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1DisksTelemetries",
-		trace.WithAttributes(),
+		trace.WithAttributes(
+			attribute.String("deviceID", deviceID),
+		),
 	)
 	defer span.End()
 
@@ -191,6 +203,7 @@ func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, telem
 			_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
 				trace.WithAttributes(
 					attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+					attribute.String("deviceID", deviceID),
 					attribute.String("identifier", telemetry.Identifier),
 					attribute.String("label", disk.Label),
 					attribute.String("mountpoint", disk.Mountpoint),
@@ -203,6 +216,7 @@ func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, telem
 
 			if err := batch.Append(
 				telemetry.Timestamp.AsTime(),
+				deviceID,
 				telemetry.Identifier,
 				disk.Label,
 				disk.Mountpoint,
@@ -231,9 +245,11 @@ func (chs *ClickhouseSource) IngestV1DisksTelemetries(ctx context.Context, telem
 	return nil
 }
 
-func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, telemetries []*v1.Telemetry) error {
+func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, deviceID string, telemetries []*v1.Telemetry) error {
 	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.IngestV1NetworksTelemetries",
-		trace.WithAttributes(),
+		trace.WithAttributes(
+			attribute.String("deviceID", deviceID),
+		),
 	)
 	defer span.End()
 
@@ -258,6 +274,7 @@ func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, te
 			_, appendSpan := otlp.IngestTracer.Start(ctx, "appending to batch",
 				trace.WithAttributes(
 					attribute.String("timestamp", telemetry.Timestamp.AsTime().Format(time.RFC3339)),
+					attribute.String("deviceID", deviceID),
 					attribute.String("identifier", telemetry.Identifier),
 					attribute.String("name", nic.Name),
 					attribute.Int64("bytes_sent", int64(nic.BytesSent)),
@@ -268,6 +285,7 @@ func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, te
 
 			if err := batch.Append(
 				telemetry.Timestamp.AsTime(),
+				deviceID,
 				telemetry.Identifier,
 				nic.Name,
 				nic.BytesSent,
