@@ -75,16 +75,19 @@ func (ic *IngestClient) SendData(telemetries []*v1.Telemetry) error {
 
 	md := metadata.New(map[string]string{
 		"x-signature": signatureHex,
+		"x-client-id": ic.ClientID,
 	})
-	ctx = metadata.NewOutgoingContext(ctx, md)
 
-	response, err := ic.client.SendTelemetry(ctx, req)
+	response, err := ic.client.SendTelemetry(
+		metadata.NewOutgoingContext(ctx, md),
+		req,
+	)
 	if err != nil {
 		return errors.Join(fmt.Errorf("failed to send data"), err)
 	}
 
 	if !response.Success {
-		return errors.New("failed to send data")
+		return errors.New("response was not successful")
 	}
 
 	return nil
@@ -97,12 +100,29 @@ func (ic *IngestClient) HealthCheck(ctx context.Context, identifier string) erro
 	)
 	defer cancel()
 
-	_, err := ic.client.HealthCheck(ctx, &v1.HealthCheckRequest{
+	req := &v1.HealthCheckRequest{
 		Timestamp:  timestamppb.Now(),
 		Identifier: identifier,
-	})
+	}
+
+	payloadBytes, err := proto.Marshal(req)
 	if err != nil {
-		return errors.Join(fmt.Errorf("failed to health check"), err)
+		return fmt.Errorf("failed to marshal telemetry: %w", err)
+	}
+
+	mac := hmac.New(sha256.New, ic.ClientSecret)
+	mac.Write(payloadBytes)
+	signature := mac.Sum(nil)
+	signatureHex := hex.EncodeToString(signature)
+
+	md := metadata.New(map[string]string{
+		"x-signature": signatureHex,
+		"x-client-id": ic.ClientID,
+	})
+
+	_, err = ic.client.HealthCheck(metadata.NewOutgoingContext(ctx, md), req)
+	if err != nil {
+		return errors.Join(fmt.Errorf("failed to HealthCheck"), err)
 	}
 
 	return nil

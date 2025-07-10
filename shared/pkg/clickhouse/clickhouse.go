@@ -323,7 +323,7 @@ func NewLocalConnection(logger *slog.Logger) (*ClickhouseSource, error) {
 			Username: "default",
 			Password: "",
 		},
-		Debug: true,
+		Debug: false,
 	})
 
 	if err != nil {
