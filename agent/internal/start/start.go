@@ -55,7 +55,7 @@ func Start(ctx context.Context, config *config.Config) {
 			case <-ctx.Done():
 				return
 			case <-processTicker.C:
-				runInfo := systeminformation.GetSystemInformation(config)
+				runInfo := systeminformation.GetSystemInformation()
 
 				telemetryDisks := iter.Map(runInfo.Disks, func(disk systeminformation.SystemInformationDisk) *v1.TelemetryDisk {
 					return &v1.TelemetryDisk{

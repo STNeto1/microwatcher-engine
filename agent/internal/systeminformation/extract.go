@@ -3,7 +3,6 @@ package systeminformation
 import (
 	"time"
 
-	"github.com/microwatcher/agent/internal/config"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
 	"github.com/shirou/gopsutil/mem"
@@ -36,7 +35,7 @@ type SystemInformation struct {
 	Networks    []SystemInformationNetwork
 }
 
-func GetSystemInformation(cfg *config.Config) SystemInformation {
+func GetSystemInformation() SystemInformation {
 	v, _ := mem.VirtualMemory()
 	// TODO: assert it doesn't fail
 
