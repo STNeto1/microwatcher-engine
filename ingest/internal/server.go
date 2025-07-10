@@ -57,6 +57,9 @@ func (svc *Server) ValidateMetadata(ctx context.Context) (string, string, error)
 			slog.String("clientID", clientID),
 		)
 
+		span.RecordError(fmt.Errorf("missing credentials"))
+		span.SetStatus(codes.Error, "missing credentials")
+
 		return "", "", fmt.Errorf("missing credentials")
 	}
 
@@ -65,8 +68,8 @@ func (svc *Server) ValidateMetadata(ctx context.Context) (string, string, error)
 			slog.String("clientID", clientID),
 		)
 
-		// span.RecordError(fmt.Errorf("invalid client id"))
-		// span.SetStatus(codes.Error, "invalid client id")
+		span.RecordError(fmt.Errorf("invalid client id"))
+		span.SetStatus(codes.Error, "invalid client id")
 		return "", "", fmt.Errorf("invalid client id")
 	}
 
