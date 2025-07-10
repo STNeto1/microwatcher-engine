@@ -35,7 +35,19 @@ func extractHeader(md metadata.MD, key string) string {
 	return values[0]
 }
 
-func (svc *Server) ValidateMetadata(ctx context.Context, md metadata.MD) (string, string, error) {
+func (svc *Server) ValidateMetadata(ctx context.Context) (string, string, error) {
+	_, span := otlp.IngestTracer.Start(ctx, "Server.ValidateMetadata")
+	defer span.End()
+
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		svc.Logger.Error("failed to get metadata")
+
+		span.RecordError(fmt.Errorf("failed to get metadata"))
+		span.SetStatus(codes.Error, "failed to get metadata")
+		return "", "", fmt.Errorf("failed to get metadata")
+	}
+
 	signature := extractHeader(md, "x-signature")
 	clientID := extractHeader(md, "x-client-id")
 
@@ -118,16 +130,7 @@ func (svc *Server) Ping(ctx context.Context, req *v1.PingRequest) (*v1.PingRespo
 	)
 	defer span.End()
 
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		svc.Logger.Error("failed to get metadata")
-
-		span.RecordError(fmt.Errorf("failed to get metadata"))
-		span.SetStatus(codes.Error, "failed to get metadata")
-		return nil, fmt.Errorf("failed to get metadata")
-	}
-
-	signature, deviceID, err := svc.ValidateMetadata(ctx, md)
+	signature, deviceID, err := svc.ValidateMetadata(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -155,16 +158,7 @@ func (svc *Server) HealthCheck(ctx context.Context, req *v1.HealthCheckRequest) 
 	)
 	defer span.End()
 
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		svc.Logger.Error("failed to get metadata")
-
-		span.RecordError(fmt.Errorf("failed to get metadata"))
-		span.SetStatus(codes.Error, "failed to get metadata")
-		return nil, fmt.Errorf("failed to get metadata")
-	}
-
-	signature, deviceID, err := svc.ValidateMetadata(ctx, md)
+	signature, deviceID, err := svc.ValidateMetadata(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
@@ -197,16 +191,7 @@ func (svc *Server) SendTelemetry(ctx context.Context, req *v1.SendTelemetryReque
 	)
 	defer span.End()
 
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		svc.Logger.Error("failed to get metadata")
-
-		span.RecordError(fmt.Errorf("failed to get metadata"))
-		span.SetStatus(codes.Error, "failed to get metadata")
-		return nil, fmt.Errorf("failed to get metadata")
-	}
-
-	signature, deviceID, err := svc.ValidateMetadata(ctx, md)
+	signature, deviceID, err := svc.ValidateMetadata(ctx)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, err.Error())
