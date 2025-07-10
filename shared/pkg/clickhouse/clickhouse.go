@@ -295,7 +295,7 @@ func (chs *ClickhouseSource) IngestV1NetworksTelemetries(ctx context.Context, te
 }
 
 func (chs *ClickhouseSource) FindDeviceByID(ctx context.Context, deviceID string) (*ClickhouseDevice, error) {
-	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.FindDeviceBySecret",
+	spanCtx, span := otlp.IngestTracer.Start(ctx, "ClickhouseSource.FindDeviceByID",
 		trace.WithAttributes(
 			attribute.String("deviceID", deviceID),
 		),
