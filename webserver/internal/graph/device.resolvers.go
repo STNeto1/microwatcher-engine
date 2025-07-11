@@ -11,7 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	"github.com/microwatcher/shared/pkg/iter"
+	"github.com/microwatcher/shared/pkg/otlp"
 	"github.com/microwatcher/webserver/internal/graph/model"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // CreateDevice is the resolver for the createDevice field.
@@ -26,13 +29,22 @@ func (r *mutationResolver) ResetDeviceSecret(ctx context.Context, deviceID uuid.
 
 // Devices is the resolver for the devices field.
 func (r *queryResolver) Devices(ctx context.Context) (model.DeviceQueryResult, error) {
-	chDevices, err := r.ChSource.ListDevices(ctx)
+	spanCtx, span := otlp.WebServerTracer.Start(ctx, "Query.Devices",
+		trace.WithAttributes(),
+	)
+	defer span.End()
 
+	chDevices, err := r.ChSource.ListDevices(spanCtx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to list devices")
+
 		return model.GenericError{
 			Message: err.Error(),
 		}, nil
 	}
+
+	span.SetStatus(codes.Ok, "listed devices")
 
 	return model.DeviceList{
 		Devices: iter.Map(chDevices, func(chDevice *clickhouse.ClickhouseDevice) *model.Device {
@@ -51,5 +63,7 @@ func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
-type mutationResolver struct{ *Resolver }
-type queryResolver struct{ *Resolver }
+type (
+	mutationResolver struct{ *Resolver }
+	queryResolver    struct{ *Resolver }
+)

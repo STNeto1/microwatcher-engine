@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"log/slog"
 	"os"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/99designs/gqlgen/graphql/handler/transport"
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gin-gonic/gin"
+	_ "github.com/joho/godotenv/autoload"
+	"github.com/microwatcher/webserver/internal/otlp"
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	"github.com/microwatcher/shared/pkg/logger"
 	"github.com/microwatcher/webserver/internal/graph"
@@ -19,8 +22,8 @@ import (
 func main() {
 	logger := logger.NewDefaultLogger()
 
-	// otelShutdown := otlp.InitLocalTracer(context.Background(), logger)
-	// defer otelShutdown()
+	otelShutdown := otlp.InitLocalTracer(context.Background(), logger)
+	defer otelShutdown()
 
 	localSource, err := clickhouse.NewLocalConnection(logger)
 	if err != nil {
