@@ -29,7 +29,9 @@ func (r *mutationResolver) ResetDeviceSecret(ctx context.Context, deviceID uuid.
 
 // Devices is the resolver for the devices field.
 func (r *queryResolver) Devices(ctx context.Context) (model.DeviceQueryResult, error) {
-	spanCtx, span := otlp.WebServerTracer.Start(ctx, "Query.Devices",
+	spanCtx, span := otlp.WebServerTracer.Start(
+		ctx,
+		"QueryResolver.Devices",
 		trace.WithAttributes(),
 	)
 	defer span.End()

@@ -12,11 +12,12 @@ import (
 	"github.com/99designs/gqlgen/graphql/playground"
 	"github.com/gin-gonic/gin"
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/microwatcher/webserver/internal/otlp"
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	"github.com/microwatcher/shared/pkg/logger"
 	"github.com/microwatcher/webserver/internal/graph"
+	"github.com/microwatcher/webserver/internal/otlp"
 	"github.com/vektah/gqlparser/v2/ast"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func main() {
@@ -34,6 +35,8 @@ func main() {
 	}
 
 	r := gin.Default()
+	r.Use(otelgin.Middleware(otlp.ServiceName))
+
 	r.POST("/query", graphqlHandler(localSource))
 	r.GET("/", playgroundHandler())
 	r.Run()

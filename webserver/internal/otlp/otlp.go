@@ -18,7 +18,7 @@ import (
 )
 
 const (
-	serviceName    = "microwatcher-webserver"
+	ServiceName    = "microwatcher-webserver"
 	serviceVersion = "0.1.0"
 	otlpEndpoint   = "api.axiom.co"
 )
@@ -61,7 +61,7 @@ func InitLocalTracer(ctx context.Context, logger *slog.Logger) func() {
 		sdktrace.WithResource(
 			resource.NewWithAttributes(
 				semconv.SchemaURL,
-				semconv.ServiceNameKey.String(serviceName),
+				semconv.ServiceNameKey.String(ServiceName),
 				semconv.ServiceVersionKey.String(serviceVersion),
 				attribute.String("environment", os.Getenv("AXIOM_ENVIRONMENT")),
 			),
