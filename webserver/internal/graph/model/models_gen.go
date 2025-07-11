@@ -6,6 +6,35 @@ import (
 	"github.com/google/uuid"
 )
 
+type DeviceMutationResult interface {
+	IsDeviceMutationResult()
+}
+
+type DeviceQueryResult interface {
+	IsDeviceQueryResult()
+}
+
+type Error interface {
+	IsError()
+	GetMessage() string
+}
+
+type ResetDeviceSecretResult interface {
+	IsResetDeviceSecretResult()
+}
+
+type ValidationError interface {
+	IsError()
+	IsValidationError()
+	GetMessage() string
+}
+
+type BooleanResult struct {
+	Success bool `json:"success"`
+}
+
+func (BooleanResult) IsResetDeviceSecretResult() {}
+
 type CreateDevice struct {
 	Label string `json:"label"`
 }
@@ -14,6 +43,39 @@ type Device struct {
 	ID     uuid.UUID `json:"id"`
 	Label  string    `json:"label"`
 	Secret string    `json:"secret"`
+}
+
+func (Device) IsDeviceMutationResult() {}
+
+type DeviceList struct {
+	Devices []*Device `json:"devices"`
+}
+
+func (DeviceList) IsDeviceQueryResult() {}
+
+type GenericError struct {
+	Message string `json:"message"`
+}
+
+func (GenericError) IsDeviceQueryResult() {}
+
+func (GenericError) IsResetDeviceSecretResult() {}
+
+func (GenericError) IsError()                {}
+func (this GenericError) GetMessage() string { return this.Message }
+
+type InvalidLabelError struct {
+	Message string `json:"message"`
+}
+
+func (InvalidLabelError) IsValidationError()      {}
+func (this InvalidLabelError) GetMessage() string { return this.Message }
+
+func (InvalidLabelError) IsError() {}
+
+func (InvalidLabelError) IsDeviceMutationResult() {}
+
+type Mutation struct {
 }
 
 type Query struct {

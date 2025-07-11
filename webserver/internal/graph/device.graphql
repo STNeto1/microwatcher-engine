@@ -1,0 +1,37 @@
+type Device {
+	id: ID!
+	label: String!
+	secret: String!
+}
+
+input CreateDevice {
+	label: String!
+}
+
+type InvalidLabelError implements ValidationError & Error {
+	message: String!
+	# TODO: add field validation errors
+	# field: String!
+}
+
+type DeviceList {
+	devices: [Device!]!
+}
+
+union DeviceQueryResult = DeviceList | GenericError
+union DeviceMutationResult = Device | InvalidLabelError
+
+type BooleanResult {
+	success: Boolean!
+}
+
+union ResetDeviceSecretResult = BooleanResult | GenericError
+
+extend type Query {
+	devices: DeviceQueryResult!
+}
+
+extend type Mutation {
+	createDevice(input: CreateDevice!): DeviceMutationResult!
+	resetDeviceSecret(deviceID: ID!): ResetDeviceSecretResult!
+}

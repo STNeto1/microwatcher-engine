@@ -1,0 +1,19 @@
+# errors.graphqls
+
+interface Error {
+	message: String!
+}
+
+interface ValidationError implements Error {
+	message: String!
+	# TODO: add field validation errors
+	# field: String!
+}
+
+# interface AuthError implements Error {
+#   message: String!
+# }
+
+type GenericError implements Error {
+	message: String!
+}

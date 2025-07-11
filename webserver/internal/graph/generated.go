@@ -40,6 +40,7 @@ type Config struct {
 }
 
 type ResolverRoot interface {
+	Mutation() MutationResolver
 	Query() QueryResolver
 }
 
@@ -47,23 +48,44 @@ type DirectiveRoot struct {
 }
 
 type ComplexityRoot struct {
+	BooleanResult struct {
+		Success func(childComplexity int) int
+	}
+
 	Device struct {
 		ID     func(childComplexity int) int
 		Label  func(childComplexity int) int
 		Secret func(childComplexity int) int
 	}
 
-	Query struct {
+	DeviceList struct {
+		Devices func(childComplexity int) int
+	}
+
+	GenericError struct {
+		Message func(childComplexity int) int
+	}
+
+	InvalidLabelError struct {
+		Message func(childComplexity int) int
+	}
+
+	Mutation struct {
 		CreateDevice      func(childComplexity int, input model.CreateDevice) int
-		Devices           func(childComplexity int) int
 		ResetDeviceSecret func(childComplexity int, deviceID uuid.UUID) int
+	}
+
+	Query struct {
+		Devices func(childComplexity int) int
 	}
 }
 
+type MutationResolver interface {
+	CreateDevice(ctx context.Context, input model.CreateDevice) (model.DeviceMutationResult, error)
+	ResetDeviceSecret(ctx context.Context, deviceID uuid.UUID) (model.ResetDeviceSecretResult, error)
+}
 type QueryResolver interface {
-	Devices(ctx context.Context) ([]*model.Device, error)
-	CreateDevice(ctx context.Context, input model.CreateDevice) (*model.Device, error)
-	ResetDeviceSecret(ctx context.Context, deviceID uuid.UUID) (*model.Device, error)
+	Devices(ctx context.Context) (model.DeviceQueryResult, error)
 }
 
 type executableSchema struct {
@@ -84,6 +106,13 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 	ec := executionContext{nil, e, 0, 0, nil}
 	_ = ec
 	switch typeName + "." + field {
+
+	case "BooleanResult.success":
+		if e.complexity.BooleanResult.Success == nil {
+			break
+		}
+
+		return e.complexity.BooleanResult.Success(childComplexity), true
 
 	case "Device.id":
 		if e.complexity.Device.ID == nil {
@@ -106,17 +135,50 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 
 		return e.complexity.Device.Secret(childComplexity), true
 
-	case "Query.createDevice":
-		if e.complexity.Query.CreateDevice == nil {
+	case "DeviceList.devices":
+		if e.complexity.DeviceList.Devices == nil {
 			break
 		}
 
-		args, err := ec.field_Query_createDevice_args(ctx, rawArgs)
+		return e.complexity.DeviceList.Devices(childComplexity), true
+
+	case "GenericError.message":
+		if e.complexity.GenericError.Message == nil {
+			break
+		}
+
+		return e.complexity.GenericError.Message(childComplexity), true
+
+	case "InvalidLabelError.message":
+		if e.complexity.InvalidLabelError.Message == nil {
+			break
+		}
+
+		return e.complexity.InvalidLabelError.Message(childComplexity), true
+
+	case "Mutation.createDevice":
+		if e.complexity.Mutation.CreateDevice == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_createDevice_args(ctx, rawArgs)
 		if err != nil {
 			return 0, false
 		}
 
-		return e.complexity.Query.CreateDevice(childComplexity, args["input"].(model.CreateDevice)), true
+		return e.complexity.Mutation.CreateDevice(childComplexity, args["input"].(model.CreateDevice)), true
+
+	case "Mutation.resetDeviceSecret":
+		if e.complexity.Mutation.ResetDeviceSecret == nil {
+			break
+		}
+
+		args, err := ec.field_Mutation_resetDeviceSecret_args(ctx, rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Mutation.ResetDeviceSecret(childComplexity, args["deviceID"].(uuid.UUID)), true
 
 	case "Query.devices":
 		if e.complexity.Query.Devices == nil {
@@ -124,18 +186,6 @@ func (e *executableSchema) Complexity(ctx context.Context, typeName, field strin
 		}
 
 		return e.complexity.Query.Devices(childComplexity), true
-
-	case "Query.resetDeviceSecret":
-		if e.complexity.Query.ResetDeviceSecret == nil {
-			break
-		}
-
-		args, err := ec.field_Query_resetDeviceSecret_args(ctx, rawArgs)
-		if err != nil {
-			return 0, false
-		}
-
-		return e.complexity.Query.ResetDeviceSecret(childComplexity, args["deviceID"].(uuid.UUID)), true
 
 	}
 	return 0, false
@@ -179,6 +229,21 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 			}
 
 			return &response
+		}
+	case ast.Mutation:
+		return func(ctx context.Context) *graphql.Response {
+			if !first {
+				return nil
+			}
+			first = false
+			ctx = graphql.WithUnmarshalerMap(ctx, inputUnmarshalMap)
+			data := ec._Mutation(ctx, opCtx.Operation.SelectionSet)
+			var buf bytes.Buffer
+			data.MarshalGQL(&buf)
+
+			return &graphql.Response{
+				Data: buf.Bytes(),
+			}
 		}
 
 	default:
@@ -227,7 +292,7 @@ func (ec *executionContext) introspectType(name string) (*introspection.Type, er
 	return introspection.WrapTypeFromDef(ec.Schema(), ec.Schema().Types[name]), nil
 }
 
-//go:embed "devices.graphql"
+//go:embed "device.graphql" "errors.graphql"
 var sourcesFS embed.FS
 
 func sourceData(filename string) string {
@@ -239,13 +304,60 @@ func sourceData(filename string) string {
 }
 
 var sources = []*ast.Source{
-	{Name: "devices.graphql", Input: sourceData("devices.graphql"), BuiltIn: false},
+	{Name: "device.graphql", Input: sourceData("device.graphql"), BuiltIn: false},
+	{Name: "errors.graphql", Input: sourceData("errors.graphql"), BuiltIn: false},
 }
 var parsedSchema = gqlparser.MustLoadSchema(sources...)
 
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_Mutation_createDevice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_createDevice_argsInput(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["input"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_createDevice_argsInput(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (model.CreateDevice, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
+	if tmp, ok := rawArgs["input"]; ok {
+		return ec.unmarshalNCreateDevice2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐCreateDevice(ctx, tmp)
+	}
+
+	var zeroVal model.CreateDevice
+	return zeroVal, nil
+}
+
+func (ec *executionContext) field_Mutation_resetDeviceSecret_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
+	var err error
+	args := map[string]any{}
+	arg0, err := ec.field_Mutation_resetDeviceSecret_argsDeviceID(ctx, rawArgs)
+	if err != nil {
+		return nil, err
+	}
+	args["deviceID"] = arg0
+	return args, nil
+}
+func (ec *executionContext) field_Mutation_resetDeviceSecret_argsDeviceID(
+	ctx context.Context,
+	rawArgs map[string]any,
+) (uuid.UUID, error) {
+	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceID"))
+	if tmp, ok := rawArgs["deviceID"]; ok {
+		return ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
+	}
+
+	var zeroVal uuid.UUID
+	return zeroVal, nil
+}
 
 func (ec *executionContext) field_Query___type_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
 	var err error
@@ -267,52 +379,6 @@ func (ec *executionContext) field_Query___type_argsName(
 	}
 
 	var zeroVal string
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_createDevice_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Query_createDevice_argsInput(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["input"] = arg0
-	return args, nil
-}
-func (ec *executionContext) field_Query_createDevice_argsInput(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (model.CreateDevice, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("input"))
-	if tmp, ok := rawArgs["input"]; ok {
-		return ec.unmarshalNCreateDevice2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐCreateDevice(ctx, tmp)
-	}
-
-	var zeroVal model.CreateDevice
-	return zeroVal, nil
-}
-
-func (ec *executionContext) field_Query_resetDeviceSecret_args(ctx context.Context, rawArgs map[string]any) (map[string]any, error) {
-	var err error
-	args := map[string]any{}
-	arg0, err := ec.field_Query_resetDeviceSecret_argsDeviceID(ctx, rawArgs)
-	if err != nil {
-		return nil, err
-	}
-	args["deviceID"] = arg0
-	return args, nil
-}
-func (ec *executionContext) field_Query_resetDeviceSecret_argsDeviceID(
-	ctx context.Context,
-	rawArgs map[string]any,
-) (uuid.UUID, error) {
-	ctx = graphql.WithPathContext(ctx, graphql.NewPathWithField("deviceID"))
-	if tmp, ok := rawArgs["deviceID"]; ok {
-		return ec.unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, tmp)
-	}
-
-	var zeroVal uuid.UUID
 	return zeroVal, nil
 }
 
@@ -415,6 +481,50 @@ func (ec *executionContext) field___Type_fields_argsIncludeDeprecated(
 // endregion ************************** directives.gotpl **************************
 
 // region    **************************** field.gotpl *****************************
+
+func (ec *executionContext) _BooleanResult_success(ctx context.Context, field graphql.CollectedField, obj *model.BooleanResult) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_BooleanResult_success(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Success, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_BooleanResult_success(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "BooleanResult",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
 
 func (ec *executionContext) _Device_id(ctx context.Context, field graphql.CollectedField, obj *model.Device) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Device_id(ctx, field)
@@ -548,6 +658,256 @@ func (ec *executionContext) fieldContext_Device_secret(_ context.Context, field 
 	return fc, nil
 }
 
+func (ec *executionContext) _DeviceList_devices(ctx context.Context, field graphql.CollectedField, obj *model.DeviceList) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DeviceList_devices(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Devices, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*model.Device)
+	fc.Result = res
+	return ec.marshalNDevice2ᚕᚖgithubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DeviceList_devices(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DeviceList",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Device_id(ctx, field)
+			case "label":
+				return ec.fieldContext_Device_label(ctx, field)
+			case "secret":
+				return ec.fieldContext_Device_secret(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Device", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _GenericError_message(ctx context.Context, field graphql.CollectedField, obj *model.GenericError) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_GenericError_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_GenericError_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "GenericError",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _InvalidLabelError_message(ctx context.Context, field graphql.CollectedField, obj *model.InvalidLabelError) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_InvalidLabelError_message(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Message, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_InvalidLabelError_message(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "InvalidLabelError",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_createDevice(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_createDevice(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().CreateDevice(rctx, fc.Args["input"].(model.CreateDevice))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.DeviceMutationResult)
+	fc.Result = res
+	return ec.marshalNDeviceMutationResult2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceMutationResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_createDevice(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type DeviceMutationResult does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_createDevice_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Mutation_resetDeviceSecret(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Mutation_resetDeviceSecret(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Mutation().ResetDeviceSecret(rctx, fc.Args["deviceID"].(uuid.UUID))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(model.ResetDeviceSecretResult)
+	fc.Result = res
+	return ec.marshalNResetDeviceSecretResult2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐResetDeviceSecretResult(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Mutation_resetDeviceSecret(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Mutation",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ResetDeviceSecretResult does not have child fields")
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Mutation_resetDeviceSecret_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return fc, err
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_devices(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_devices(ctx, field)
 	if err != nil {
@@ -574,9 +934,9 @@ func (ec *executionContext) _Query_devices(ctx context.Context, field graphql.Co
 		}
 		return graphql.Null
 	}
-	res := resTmp.([]*model.Device)
+	res := resTmp.(model.DeviceQueryResult)
 	fc.Result = res
-	return ec.marshalNDevice2ᚕᚖgithubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceᚄ(ctx, field.Selections, res)
+	return ec.marshalNDeviceQueryResult2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceQueryResult(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Query_devices(_ context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -586,142 +946,8 @@ func (ec *executionContext) fieldContext_Query_devices(_ context.Context, field 
 		IsMethod:   true,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Device_id(ctx, field)
-			case "label":
-				return ec.fieldContext_Device_label(ctx, field)
-			case "secret":
-				return ec.fieldContext_Device_secret(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Device", field.Name)
+			return nil, errors.New("field of type DeviceQueryResult does not have child fields")
 		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_createDevice(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_createDevice(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().CreateDevice(rctx, fc.Args["input"].(model.CreateDevice))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.Device)
-	fc.Result = res
-	return ec.marshalNDevice2ᚖgithubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDevice(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_createDevice(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Device_id(ctx, field)
-			case "label":
-				return ec.fieldContext_Device_label(ctx, field)
-			case "secret":
-				return ec.fieldContext_Device_secret(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Device", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_createDevice_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _Query_resetDeviceSecret(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_Query_resetDeviceSecret(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (any, error) {
-		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Query().ResetDeviceSecret(rctx, fc.Args["deviceID"].(uuid.UUID))
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(*model.Device)
-	fc.Result = res
-	return ec.marshalNDevice2ᚖgithubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDevice(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_Query_resetDeviceSecret(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "Query",
-		Field:      field,
-		IsMethod:   true,
-		IsResolver: true,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "id":
-				return ec.fieldContext_Device_id(ctx, field)
-			case "label":
-				return ec.fieldContext_Device_label(ctx, field)
-			case "secret":
-				return ec.fieldContext_Device_secret(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type Device", field.Name)
-		},
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = ec.Recover(ctx, r)
-			ec.Error(ctx, err)
-		}
-	}()
-	ctx = graphql.WithFieldContext(ctx, fc)
-	if fc.Args, err = ec.field_Query_resetDeviceSecret_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
-		ec.Error(ctx, err)
-		return fc, err
 	}
 	return fc, nil
 }
@@ -2839,11 +3065,163 @@ func (ec *executionContext) unmarshalInputCreateDevice(ctx context.Context, obj 
 
 // region    ************************** interface.gotpl ***************************
 
+func (ec *executionContext) _DeviceMutationResult(ctx context.Context, sel ast.SelectionSet, obj model.DeviceMutationResult) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.InvalidLabelError:
+		return ec._InvalidLabelError(ctx, sel, &obj)
+	case *model.InvalidLabelError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._InvalidLabelError(ctx, sel, obj)
+	case model.Device:
+		return ec._Device(ctx, sel, &obj)
+	case *model.Device:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._Device(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _DeviceQueryResult(ctx context.Context, sel ast.SelectionSet, obj model.DeviceQueryResult) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GenericError:
+		return ec._GenericError(ctx, sel, &obj)
+	case *model.GenericError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericError(ctx, sel, obj)
+	case model.DeviceList:
+		return ec._DeviceList(ctx, sel, &obj)
+	case *model.DeviceList:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._DeviceList(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _Error(ctx context.Context, sel ast.SelectionSet, obj model.Error) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.InvalidLabelError:
+		return ec._InvalidLabelError(ctx, sel, &obj)
+	case *model.InvalidLabelError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._InvalidLabelError(ctx, sel, obj)
+	case model.ValidationError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._ValidationError(ctx, sel, obj)
+	case model.GenericError:
+		return ec._GenericError(ctx, sel, &obj)
+	case *model.GenericError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericError(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _ResetDeviceSecretResult(ctx context.Context, sel ast.SelectionSet, obj model.ResetDeviceSecretResult) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.GenericError:
+		return ec._GenericError(ctx, sel, &obj)
+	case *model.GenericError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericError(ctx, sel, obj)
+	case model.BooleanResult:
+		return ec._BooleanResult(ctx, sel, &obj)
+	case *model.BooleanResult:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._BooleanResult(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
+func (ec *executionContext) _ValidationError(ctx context.Context, sel ast.SelectionSet, obj model.ValidationError) graphql.Marshaler {
+	switch obj := (obj).(type) {
+	case nil:
+		return graphql.Null
+	case model.InvalidLabelError:
+		return ec._InvalidLabelError(ctx, sel, &obj)
+	case *model.InvalidLabelError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._InvalidLabelError(ctx, sel, obj)
+	default:
+		panic(fmt.Errorf("unexpected type %T", obj))
+	}
+}
+
 // endregion ************************** interface.gotpl ***************************
 
 // region    **************************** object.gotpl ****************************
 
-var deviceImplementors = []string{"Device"}
+var booleanResultImplementors = []string{"BooleanResult", "ResetDeviceSecretResult"}
+
+func (ec *executionContext) _BooleanResult(ctx context.Context, sel ast.SelectionSet, obj *model.BooleanResult) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, booleanResultImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("BooleanResult")
+		case "success":
+			out.Values[i] = ec._BooleanResult_success(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var deviceImplementors = []string{"Device", "DeviceMutationResult"}
 
 func (ec *executionContext) _Device(ctx context.Context, sel ast.SelectionSet, obj *model.Device) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, deviceImplementors)
@@ -2866,6 +3244,179 @@ func (ec *executionContext) _Device(ctx context.Context, sel ast.SelectionSet, o
 			}
 		case "secret":
 			out.Values[i] = ec._Device_secret(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var deviceListImplementors = []string{"DeviceList", "DeviceQueryResult"}
+
+func (ec *executionContext) _DeviceList(ctx context.Context, sel ast.SelectionSet, obj *model.DeviceList) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, deviceListImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DeviceList")
+		case "devices":
+			out.Values[i] = ec._DeviceList_devices(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var genericErrorImplementors = []string{"GenericError", "DeviceQueryResult", "ResetDeviceSecretResult", "Error"}
+
+func (ec *executionContext) _GenericError(ctx context.Context, sel ast.SelectionSet, obj *model.GenericError) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, genericErrorImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("GenericError")
+		case "message":
+			out.Values[i] = ec._GenericError_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var invalidLabelErrorImplementors = []string{"InvalidLabelError", "ValidationError", "Error", "DeviceMutationResult"}
+
+func (ec *executionContext) _InvalidLabelError(ctx context.Context, sel ast.SelectionSet, obj *model.InvalidLabelError) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, invalidLabelErrorImplementors)
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("InvalidLabelError")
+		case "message":
+			out.Values[i] = ec._InvalidLabelError_message(ctx, field, obj)
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch(ctx)
+	if out.Invalids > 0 {
+		return graphql.Null
+	}
+
+	atomic.AddInt32(&ec.deferred, int32(len(deferred)))
+
+	for label, dfs := range deferred {
+		ec.processDeferredGroup(graphql.DeferredGroup{
+			Label:    label,
+			Path:     graphql.GetPath(ctx),
+			FieldSet: dfs,
+			Context:  ctx,
+		})
+	}
+
+	return out
+}
+
+var mutationImplementors = []string{"Mutation"}
+
+func (ec *executionContext) _Mutation(ctx context.Context, sel ast.SelectionSet) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, mutationImplementors)
+	ctx = graphql.WithFieldContext(ctx, &graphql.FieldContext{
+		Object: "Mutation",
+	})
+
+	out := graphql.NewFieldSet(fields)
+	deferred := make(map[string]*graphql.FieldSet)
+	for i, field := range fields {
+		innerCtx := graphql.WithRootFieldContext(ctx, &graphql.RootFieldContext{
+			Object: field.Name,
+			Field:  field,
+		})
+
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("Mutation")
+		case "createDevice":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_createDevice(ctx, field)
+			})
+			if out.Values[i] == graphql.Null {
+				out.Invalids++
+			}
+		case "resetDeviceSecret":
+			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
+				return ec._Mutation_resetDeviceSecret(ctx, field)
+			})
 			if out.Values[i] == graphql.Null {
 				out.Invalids++
 			}
@@ -2921,50 +3472,6 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 					}
 				}()
 				res = ec._Query_devices(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "createDevice":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_createDevice(ctx, field)
-				if res == graphql.Null {
-					atomic.AddUint32(&fs.Invalids, 1)
-				}
-				return res
-			}
-
-			rrm := func(ctx context.Context) graphql.Marshaler {
-				return ec.OperationContext.RootResolverMiddleware(ctx,
-					func(ctx context.Context) graphql.Marshaler { return innerFunc(ctx, out) })
-			}
-
-			out.Concurrently(i, func(ctx context.Context) graphql.Marshaler { return rrm(innerCtx) })
-		case "resetDeviceSecret":
-			field := field
-
-			innerFunc := func(ctx context.Context, fs *graphql.FieldSet) (res graphql.Marshaler) {
-				defer func() {
-					if r := recover(); r != nil {
-						ec.Error(ctx, ec.Recover(ctx, r))
-					}
-				}()
-				res = ec._Query_resetDeviceSecret(ctx, field)
 				if res == graphql.Null {
 					atomic.AddUint32(&fs.Invalids, 1)
 				}
@@ -3364,10 +3871,6 @@ func (ec *executionContext) unmarshalNCreateDevice2githubᚗcomᚋmicrowatcher�
 	return res, graphql.ErrorOnPath(ctx, err)
 }
 
-func (ec *executionContext) marshalNDevice2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDevice(ctx context.Context, sel ast.SelectionSet, v model.Device) graphql.Marshaler {
-	return ec._Device(ctx, sel, &v)
-}
-
 func (ec *executionContext) marshalNDevice2ᚕᚖgithubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceᚄ(ctx context.Context, sel ast.SelectionSet, v []*model.Device) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -3422,6 +3925,26 @@ func (ec *executionContext) marshalNDevice2ᚖgithubᚗcomᚋmicrowatcherᚋwebs
 	return ec._Device(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNDeviceMutationResult2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceMutationResult(ctx context.Context, sel ast.SelectionSet, v model.DeviceMutationResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeviceMutationResult(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNDeviceQueryResult2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐDeviceQueryResult(ctx context.Context, sel ast.SelectionSet, v model.DeviceQueryResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._DeviceQueryResult(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx context.Context, v any) (uuid.UUID, error) {
 	res, err := graphql.UnmarshalUUID(v)
 	return res, graphql.ErrorOnPath(ctx, err)
@@ -3436,6 +3959,16 @@ func (ec *executionContext) marshalNID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx c
 		}
 	}
 	return res
+}
+
+func (ec *executionContext) marshalNResetDeviceSecretResult2githubᚗcomᚋmicrowatcherᚋwebserverᚋinternalᚋgraphᚋmodelᚐResetDeviceSecretResult(ctx context.Context, sel ast.SelectionSet, v model.ResetDeviceSecretResult) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ResetDeviceSecretResult(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNString2string(ctx context.Context, v any) (string, error) {
