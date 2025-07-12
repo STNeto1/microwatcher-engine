@@ -19,7 +19,7 @@ type DeviceList {
 }
 
 union DeviceQueryResult = DeviceList | GenericError
-union DeviceMutationResult = Device | InvalidLabelError
+union DeviceMutationResult = Device | InvalidLabelError | GenericError
 
 type BooleanResult {
 	success: Boolean!

@@ -6,25 +6,66 @@ package graph
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/microwatcher/shared/pkg/clickhouse"
 	"github.com/microwatcher/shared/pkg/iter"
 	"github.com/microwatcher/shared/pkg/otlp"
 	"github.com/microwatcher/webserver/internal/graph/model"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 )
 
 // CreateDevice is the resolver for the createDevice field.
 func (r *mutationResolver) CreateDevice(ctx context.Context, input model.CreateDevice) (model.DeviceMutationResult, error) {
-	panic(fmt.Errorf("not implemented: CreateDevice - createDevice"))
+	spanCtx, span := otlp.WebServerTracer.Start(
+		ctx,
+		"MutationResolver.CreateDevice",
+		trace.WithAttributes(
+			attribute.String("label", input.Label),
+		),
+	)
+	defer span.End()
+
+	chDevice, err := r.ChSource.CreateDevice(spanCtx, input.Label)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to create device")
+
+		return model.GenericError{Message: err.Error()}, nil
+	}
+
+	span.SetStatus(codes.Ok, "created device")
+
+	return model.Device{
+		ID:     chDevice.ID,
+		Label:  chDevice.Label,
+		Secret: chDevice.Secret,
+	}, nil
 }
 
 // ResetDeviceSecret is the resolver for the resetDeviceSecret field.
 func (r *mutationResolver) ResetDeviceSecret(ctx context.Context, deviceID uuid.UUID) (model.ResetDeviceSecretResult, error) {
-	panic(fmt.Errorf("not implemented: ResetDeviceSecret - resetDeviceSecret"))
+	spanCtx, span := otlp.WebServerTracer.Start(
+		ctx,
+		"MutationResolver.ResetDeviceSecret",
+		trace.WithAttributes(
+			attribute.String("deviceID", deviceID.String()),
+		),
+	)
+	defer span.End()
+
+	if err := r.ChSource.ResetDeviceSecret(spanCtx, deviceID.String()); err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "failed to reset device secret")
+
+		return model.GenericError{Message: err.Error()}, nil
+	}
+
+	span.SetStatus(codes.Ok, "reset device secret")
+
+	return model.BooleanResult{Success: true}, nil
 }
 
 // Devices is the resolver for the devices field.
@@ -51,7 +92,7 @@ func (r *queryResolver) Devices(ctx context.Context) (model.DeviceQueryResult, e
 	return model.DeviceList{
 		Devices: iter.Map(chDevices, func(chDevice *clickhouse.ClickhouseDevice) *model.Device {
 			return &model.Device{
-				ID:     chDevice.ID,
+				ID:     uuid.MustParse(chDevice.ID.String()),
 				Label:  chDevice.Label,
 				Secret: chDevice.Secret,
 			}
@@ -65,7 +106,5 @@ func (r *Resolver) Mutation() MutationResolver { return &mutationResolver{r} }
 // Query returns QueryResolver implementation.
 func (r *Resolver) Query() QueryResolver { return &queryResolver{r} }
 
-type (
-	mutationResolver struct{ *Resolver }
-	queryResolver    struct{ *Resolver }
-)
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }

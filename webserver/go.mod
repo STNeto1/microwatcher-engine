@@ -54,6 +54,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pierrec/lz4/v4 v4.1.22 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/samborkent/uuidv7 v0.0.0-20231110121620-f2e19d87e48b // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sosodev/duration v1.3.1 // indirect

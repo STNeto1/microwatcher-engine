@@ -3076,6 +3076,13 @@ func (ec *executionContext) _DeviceMutationResult(ctx context.Context, sel ast.S
 			return graphql.Null
 		}
 		return ec._InvalidLabelError(ctx, sel, obj)
+	case model.GenericError:
+		return ec._GenericError(ctx, sel, &obj)
+	case *model.GenericError:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._GenericError(ctx, sel, obj)
 	case model.Device:
 		return ec._Device(ctx, sel, &obj)
 	case *model.Device:
@@ -3309,7 +3316,7 @@ func (ec *executionContext) _DeviceList(ctx context.Context, sel ast.SelectionSe
 	return out
 }
 
-var genericErrorImplementors = []string{"GenericError", "DeviceQueryResult", "ResetDeviceSecretResult", "Error"}
+var genericErrorImplementors = []string{"GenericError", "DeviceQueryResult", "DeviceMutationResult", "ResetDeviceSecretResult", "Error"}
 
 func (ec *executionContext) _GenericError(ctx context.Context, sel ast.SelectionSet, obj *model.GenericError) graphql.Marshaler {
 	fields := graphql.CollectFields(ec.OperationContext, sel, genericErrorImplementors)

@@ -59,6 +59,8 @@ type GenericError struct {
 
 func (GenericError) IsDeviceQueryResult() {}
 
+func (GenericError) IsDeviceMutationResult() {}
+
 func (GenericError) IsResetDeviceSecretResult() {}
 
 func (GenericError) IsError()                {}
